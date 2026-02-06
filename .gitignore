@@ -1,0 +1,30 @@
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+error_log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Composer dependencies (if added later)
+/vendor/
+
+# Environment files
+.env
+.env.local
+
+# Session files
+sessions/

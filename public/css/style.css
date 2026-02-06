@@ -1,0 +1,372 @@
+/* CleanPlate Styles - Warm Paper Aesthetic */
+
+/* CSS Variables for theming */
+:root {
+    --color-background: #f9f6f0;
+    --color-paper: #fffef9;
+    --color-text-primary: #2c2418;
+    --color-text-secondary: #6b5d4f;
+    --color-accent: #d4a574;
+    --color-accent-hover: #c89456;
+    --color-error: #c44536;
+    --color-success: #6b8e23;
+    --color-shadow: rgba(44, 36, 24, 0.1);
+    --color-shadow-hover: rgba(44, 36, 24, 0.15);
+    
+    --font-serif: 'Georgia', 'Times New Roman', serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+/* Global Resets and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--color-text-primary);
+    background-color: var(--color-background);
+    background-image: 
+        linear-gradient(90deg, rgba(212, 165, 116, 0.03) 1px, transparent 1px),
+        linear-gradient(rgba(212, 165, 116, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Container */
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    width: 100%;
+}
+
+/* Typography - Serif for headings, Sans-serif for content */
+h1, h2, h3 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    line-height: 1.3;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+h2 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--color-accent);
+}
+
+.tagline {
+    font-size: 1.125rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+/* Input Section */
+.input-section {
+    margin-bottom: 2rem;
+}
+
+#parse-form {
+    width: 100%;
+}
+
+.input-group {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+}
+
+#url-input {
+    flex: 1;
+    padding: 0.875rem 1.25rem;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    border: 2px solid var(--color-accent);
+    border-radius: 8px;
+    background-color: var(--color-paper);
+    color: var(--color-text-primary);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--color-shadow);
+}
+
+#url-input:focus {
+    outline: none;
+    border-color: var(--color-accent-hover);
+    box-shadow: 0 4px 8px var(--color-shadow-hover);
+}
+
+#parse-btn {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    color: white;
+    background-color: var(--color-accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--color-shadow);
+    white-space: nowrap;
+}
+
+#parse-btn:hover {
+    background-color: var(--color-accent-hover);
+    box-shadow: 0 4px 8px var(--color-shadow-hover);
+    transform: translateY(-1px);
+}
+
+#parse-btn:active {
+    transform: translateY(0);
+}
+
+#parse-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Error Container */
+.error-container {
+    background-color: #fff5f5;
+    border: 2px solid var(--color-error);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px var(--color-shadow);
+}
+
+.error-container .error {
+    color: var(--color-error);
+}
+
+.error-container .error p {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.error-container .suggestions {
+    list-style: none;
+    margin-top: 1rem;
+    padding-left: 0;
+}
+
+.error-container .suggestions li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    color: var(--color-text-secondary);
+}
+
+.error-container .suggestions li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--color-error);
+    font-weight: bold;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background-color: var(--color-accent);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Recipe Container */
+.recipe-container {
+    margin-top: 2rem;
+}
+
+.recipe-card {
+    background-color: var(--color-paper);
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 8px var(--color-shadow);
+    border: 1px solid rgba(212, 165, 116, 0.2);
+}
+
+.recipe-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(212, 165, 116, 0.3);
+}
+
+.recipe-source {
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+}
+
+.recipe-source a {
+    color: var(--color-accent-hover);
+    text-decoration: none;
+}
+
+.recipe-source a:hover {
+    text-decoration: underline;
+}
+
+/* Recipe Metadata */
+.recipe-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: rgba(212, 165, 116, 0.05);
+    border-radius: 8px;
+}
+
+.metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.metadata-label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metadata-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+/* Recipe Content Sections */
+.recipe-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 768px) {
+    .recipe-content {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.recipe-section {
+    background-color: rgba(255, 254, 249, 0.8);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 165, 116, 0.15);
+}
+
+.recipe-section h3 {
+    font-size: 1.35rem;
+    margin-bottom: 1rem;
+    color: var(--color-accent-hover);
+}
+
+/* Lists - Sans-serif for modern readability */
+.ingredients-list,
+.instructions-list {
+    font-family: var(--font-sans);
+    padding-left: 1.5rem;
+}
+
+.ingredients-list li,
+.instructions-list li {
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+    color: var(--color-text-primary);
+}
+
+.ingredients-list li {
+    list-style-type: disc;
+}
+
+.instructions-list li {
+    list-style-type: decimal;
+    padding-left: 0.5rem;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    padding-top: 3rem;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 1.5rem 1rem;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    h2 {
+        font-size: 1.65rem;
+    }
+
+    .input-group {
+        flex-direction: column;
+    }
+
+    #parse-btn {
+        width: 100%;
+    }
+
+    .recipe-card {
+        padding: 1.5rem;
+    }
+
+    .toast {
+        right: 1rem;
+        left: 1rem;
+        bottom: 1rem;
+    }
+}

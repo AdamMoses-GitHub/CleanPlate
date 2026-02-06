@@ -1,0 +1,5 @@
+# Deny direct access to PHP files in the includes directory
+<Files "*.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
