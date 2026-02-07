@@ -42,6 +42,162 @@ class RecipeError extends Error {
     }
 }
 
+// Image Carousel Controller
+class ImageCarousel {
+    constructor(elements) {
+        this.elements = elements;
+        this.images = [];
+        this.currentIndex = 0;
+        this.recipeUrl = null;
+        
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        this.elements.carouselPrev.addEventListener('click', () => this.prev());
+        this.elements.carouselNext.addEventListener('click', () => this.next());
+        this.elements.carouselConfirm.addEventListener('click', () => this.selectCurrent());
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (this.elements.imageCarousel.style.display !== 'none') {
+                if (e.key === 'ArrowLeft') this.prev();
+                if (e.key === 'ArrowRight') this.next();
+                if (e.key === 'Enter') this.selectCurrent();
+            }
+        });
+    }
+
+    init(imageCandidates, recipeUrl) {
+        if (!imageCandidates || imageCandidates.length <= 1) {
+            this.hide();
+            return false;
+        }
+
+        this.images = imageCandidates;
+        this.recipeUrl = recipeUrl;
+        
+        // Check localStorage for saved preference
+        const savedIndex = this.getSavedImageIndex();
+        this.currentIndex = savedIndex !== null ? savedIndex : 0;
+
+        this.show();
+        return true;
+    }
+
+    show() {
+        if (this.images.length === 0) return;
+
+        this.elements.imageCarousel.style.display = 'block';
+        this.updateDisplay();
+    }
+
+    hide() {
+        this.elements.imageCarousel.style.display = 'none';
+    }
+
+    updateDisplay() {
+        const current = this.images[this.currentIndex];
+        
+        // Update image
+        this.elements.carouselImage.src = current.url;
+        this.elements.carouselImage.alt = current.alt || 'Recipe image candidate';
+        
+        // Update counter
+        this.elements.carouselCounter.textContent = `${this.currentIndex + 1} / ${this.images.length}`;
+        
+        // Update button states
+        this.elements.carouselPrev.disabled = this.currentIndex === 0;
+        this.elements.carouselNext.disabled = this.currentIndex === this.images.length - 1;
+    }
+
+    next() {
+        if (this.currentIndex < this.images.length - 1) {
+            this.currentIndex++;
+            this.updateDisplay();
+        }
+    }
+
+    prev() {
+        if (this.currentIndex > 0) {
+            this.currentIndex--;
+            this.updateDisplay();
+        }
+    }
+
+    selectCurrent() {
+        const selected = this.images[this.currentIndex];
+        
+        // Save preference to localStorage
+        this.saveImagePreference(this.currentIndex);
+        
+        // Update main recipe image
+        this.elements.recipeImage.src = selected.url;
+        this.elements.recipeImage.alt = selected.alt || 'Recipe';
+        this.elements.recipeImageContainer.style.display = 'block';
+        
+        // Hide carousel
+        this.hide();
+        
+        // Show toast notification
+        if (UI.showToast) {
+            UI.showToast('Image selected!', 2000);
+        }
+    }
+
+    saveImagePreference(index) {
+        if (!this.recipeUrl) return;
+        
+        try {
+            const key = `cleanplate_image_${this.getUrlHash(this.recipeUrl)}`;
+            const preference = {
+                index: index,
+                url: this.images[index].url,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(key, JSON.stringify(preference));
+        } catch (e) {
+            console.warn('Failed to save image preference:', e);
+        }
+    }
+
+    getSavedImageIndex() {
+        if (!this.recipeUrl) return null;
+        
+        try {
+            const key = `cleanplate_image_${this.getUrlHash(this.recipeUrl)}`;
+            const saved = localStorage.getItem(key);
+            
+            if (saved) {
+                const preference = JSON.parse(saved);
+                
+                // Check if preference is less than 30 days old
+                const age = Date.now() - preference.timestamp;
+                const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+                
+                if (age < maxAge && preference.index < this.images.length) {
+                    return preference.index;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load image preference:', e);
+        }
+        
+        return null;
+    }
+
+    getUrlHash(url) {
+        // Simple hash function for URL
+        let hash = 0;
+        for (let i = 0; i < url.length; i++) {
+            const char = url.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash).toString(36);
+    }
+}
+
 // API Client
 class CleanPlateAPI {
     constructor(endpoint = '../api/parser.php') {
@@ -106,6 +262,12 @@ const UI = {
         printBtn: document.getElementById('print-btn'),
         recipeImageContainer: document.getElementById('recipe-image-container'),
         recipeImage: document.getElementById('recipe-image'),
+        imageCarousel: document.getElementById('image-carousel'),
+        carouselImage: document.getElementById('carousel-image'),
+        carouselCounter: document.getElementById('carousel-counter'),
+        carouselPrev: document.getElementById('carousel-prev'),
+        carouselNext: document.getElementById('carousel-next'),
+        carouselConfirm: document.getElementById('carousel-confirm'),
         toast: document.getElementById('toast-notification')
     },
 
@@ -185,11 +347,25 @@ const UI = {
         // Render instructions
         this.renderInstructions(data.instructions || []);
 
-        // Render image if available
-        if (data.image) {
-            this.renderImage(data.image);
+        // Render image with carousel support
+        const imageCandidates = data.metadata && data.metadata.imageCandidates ? data.metadata.imageCandidates : [];
+        const primaryImage = data.metadata && data.metadata.imageUrl ? data.metadata.imageUrl : null;
+        
+        if (imageCandidates.length > 1) {
+            // Show carousel for multiple image candidates
+            const carousel = new ImageCarousel(this.elements);
+            const recipeUrl = data.source ? data.source.url : '';
+            carousel.init(imageCandidates, recipeUrl);
+        } else if (imageCandidates.length === 1) {
+            // Single candidate - display directly
+            this.renderImage(imageCandidates[0].url);
+        } else if (primaryImage) {
+            // Fallback to primary image from metadata
+            this.renderImage(primaryImage);
         } else {
+            // No image available
             this.elements.recipeImageContainer.style.display = 'none';
+            this.elements.imageCarousel.style.display = 'none';
         }
 
         // Show recipe display
@@ -210,6 +386,9 @@ const UI = {
         // Reset confidence details panel
         this.elements.confidenceDetails.style.display = 'none';
         this.elements.confidenceToggle.classList.remove('open');
+        
+        // Hide image carousel
+        this.elements.imageCarousel.style.display = 'none';
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },

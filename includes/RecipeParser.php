@@ -224,7 +224,7 @@ class RecipeParser {
             
             foreach ($items as $item) {
                 if ($this->isRecipeObject($item)) {
-                    return $this->normalizeRecipeData($item, $url);
+                    return $this->normalizeRecipeData($item, $url, $html);
                 }
             }
         }
@@ -252,7 +252,7 @@ class RecipeParser {
     /**
      * Normalize JSON-LD recipe data to standard format
      */
-    private function normalizeRecipeData($recipe, $url) {
+    private function normalizeRecipeData($recipe, $url, $html = '') {
         $normalized = [
             'title' => $this->cleanText($recipe['name'] ?? 'Untitled Recipe'),
             'source' => [
@@ -293,6 +293,13 @@ class RecipeParser {
         }
         if (isset($recipe['image'])) {
             $normalized['metadata']['imageUrl'] = $this->extractImageUrl($recipe['image']);
+        }
+        
+        // Extract image candidates for carousel
+        $primaryImage = $normalized['metadata']['imageUrl'] ?? null;
+        $imageCandidates = $this->extractImageCandidates($html, $url, $primaryImage);
+        if (!empty($imageCandidates)) {
+            $normalized['metadata']['imageCandidates'] = $imageCandidates;
         }
         
         // Apply post-processing filter to remove navigation/header junk
@@ -398,6 +405,16 @@ class RecipeParser {
             }
         } else {
             $metadata = [];
+        }
+        
+        // Extract image candidates for carousel
+        $imageCandidates = $this->extractImageCandidates($html, $url, null);
+        if (!empty($imageCandidates)) {
+            $metadata['imageCandidates'] = $imageCandidates;
+            // Set first candidate as primary image if not already set
+            if (!isset($metadata['imageUrl']) && isset($imageCandidates[0])) {
+                $metadata['imageUrl'] = $imageCandidates[0]['url'];
+            }
         }
         
         return [
@@ -909,6 +926,216 @@ class RecipeParser {
             }
         }
         return null;
+    }
+    
+    /**
+     * Extract multiple image candidates for carousel selection
+     * 
+     * @param string $html Raw HTML content
+     * @param string $baseUrl Base URL for resolving relative paths
+     * @param string|null $primaryImage Primary image from JSON-LD (if available)
+     * @return array Array of image candidates with URLs and scores
+     */
+    private function extractImageCandidates($html, $baseUrl, $primaryImage = null) {
+        if (empty($html)) {
+            return [];
+        }
+        
+        $candidates = [];
+        
+        // 1. Add primary JSON-LD image with highest score
+        if ($primaryImage) {
+            $candidates[] = [
+                'url' => $primaryImage,
+                'score' => 100,
+                'source' => 'structured-data'
+            ];
+        }
+        
+        // 2. Extract Open Graph images (second priority)
+        if (preg_match_all('/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\'>]+)["\'][^>]*>/i', $html, $matches)) {
+            foreach ($matches[1] as $ogImage) {
+                $candidates[] = [
+                    'url' => $this->normalizeImageUrl($ogImage, $baseUrl),
+                    'score' => 90,
+                    'source' => 'og:image'
+                ];
+            }
+        }
+        
+        // Also check reversed attribute order
+        if (preg_match_all('/<meta[^>]+content=["\']([^"\'>]+)["\'][^>]+property=["\']og:image["\'][^>]*>/i', $html, $matches)) {
+            foreach ($matches[1] as $ogImage) {
+                $candidates[] = [
+                    'url' => $this->normalizeImageUrl($ogImage, $baseUrl),
+                    'score' => 90,
+                    'source' => 'og:image'
+                ];
+            }
+        }
+        
+        // 3. Extract images from DOM (recipe containers)
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        
+        $xpath = new DOMXPath($dom);
+        
+        // Query for images in recipe-related containers
+        $imageNodes = $xpath->query('
+            //div[contains(@class, "recipe") or contains(@id, "recipe")]//img |
+            //article[contains(@class, "recipe")]//img |
+            //main//img[contains(@class, "recipe")] |
+            //*[contains(@class, "recipe-image")]//img
+        ');
+        
+        foreach ($imageNodes as $imgNode) {
+            $src = $imgNode->getAttribute('src');
+            if (empty($src)) {
+                $src = $imgNode->getAttribute('data-src'); // Lazy-loaded images
+            }
+            if (empty($src)) {
+                continue;
+            }
+            
+            $score = $this->scoreImage($imgNode, $src);
+            
+            // Only include images with decent scores
+            if ($score >= 40) {
+                $candidates[] = [
+                    'url' => $this->normalizeImageUrl($src, $baseUrl),
+                    'score' => $score,
+                    'source' => 'dom',
+                    'alt' => $imgNode->getAttribute('alt')
+                ];
+            }
+        }
+        
+        // Deduplicate and sort
+        $candidates = $this->deduplicateImages($candidates);
+        usort($candidates, function($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+        
+        // Return top 3 candidates
+        return array_slice($candidates, 0, 3);
+    }
+    
+    /**
+     * Score an image based on various quality signals
+     * 
+     * @param DOMElement $imgNode Image DOM node
+     * @param string $src Image source URL
+     * @return int Score from 0-100
+     */
+    private function scoreImage($imgNode, $src) {
+        $score = 50; // Base score
+        
+        // Size signals (width/height attributes)
+        $width = (int)$imgNode->getAttribute('width');
+        $height = (int)$imgNode->getAttribute('height');
+        
+        if ($width > 400 && $height > 300) {
+            $score += 20;
+        } elseif ($width > 200 && $height > 150) {
+            $score += 10;
+        }
+        
+        // File name patterns (positive signals)
+        if (preg_match('/(recipe|food|dish|final|hero|featured)/i', $src)) {
+            $score += 15;
+        }
+        
+        // File name patterns (negative signals)
+        if (preg_match('/(logo|banner|ad|sponsor|author|icon|thumb|avatar|widget)/i', $src)) {
+            $score -= 30;
+        }
+        
+        // Alt text quality
+        $alt = $imgNode->getAttribute('alt');
+        if (!empty($alt) && strlen($alt) > 10 && !preg_match('/^(photo|image|picture)$/i', $alt)) {
+            $score += 10;
+        }
+        
+        // Lazy loading attribute (signals important image)
+        if ($imgNode->getAttribute('loading') === 'lazy' || $imgNode->hasAttribute('data-src')) {
+            $score += 5;
+        }
+        
+        // Class names (positive)
+        $class = $imgNode->getAttribute('class');
+        if (preg_match('/(recipe|featured|hero|main)/i', $class)) {
+            $score += 10;
+        }
+        
+        // Class names (negative)
+        if (preg_match('/(thumbnail|icon|logo|avatar)/i', $class)) {
+            $score -= 15;
+        }
+        
+        return max(0, min(100, $score));
+    }
+    
+    /**
+     * Remove duplicate images based on URL
+     * 
+     * @param array $candidates Array of image candidates
+     * @return array Deduplicated array
+     */
+    private function deduplicateImages($candidates) {
+        $seen = [];
+        $unique = [];
+        
+        foreach ($candidates as $candidate) {
+            $url = $candidate['url'];
+            
+            // Normalize URL for comparison (remove query params, fragments)
+            $normalizedUrl = preg_replace('/[?#].*$/', '', $url);
+            
+            if (!isset($seen[$normalizedUrl])) {
+                $seen[$normalizedUrl] = true;
+                $unique[] = $candidate;
+            }
+        }
+        
+        return $unique;
+    }
+    
+    /**
+     * Normalize image URL (resolve relative URLs)
+     * 
+     * @param string $imageUrl Image URL (possibly relative)
+     * @param string $baseUrl Base URL for resolution
+     * @return string Absolute URL
+     */
+    private function normalizeImageUrl($imageUrl, $baseUrl) {
+        // Already absolute URL
+        if (preg_match('/^https?:\/\//i', $imageUrl)) {
+            return $imageUrl;
+        }
+        
+        // Protocol-relative URL
+        if (strpos($imageUrl, '//') === 0) {
+            $protocol = parse_url($baseUrl, PHP_URL_SCHEME);
+            return $protocol . ':' . $imageUrl;
+        }
+        
+        // Parse base URL
+        $baseParts = parse_url($baseUrl);
+        $scheme = $baseParts['scheme'] ?? 'https';
+        $host = $baseParts['host'] ?? '';
+        
+        // Absolute path
+        if (strpos($imageUrl, '/') === 0) {
+            return $scheme . '://' . $host . $imageUrl;
+        }
+        
+        // Relative path
+        $basePath = $baseParts['path'] ?? '/';
+        $basePath = dirname($basePath);
+        
+        return $scheme . '://' . $host . $basePath . '/' . $imageUrl;
     }
     
     /**

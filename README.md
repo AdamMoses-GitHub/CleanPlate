@@ -21,6 +21,7 @@ The **solution**: CleanPlate extracts the actual recipe—ingredients and instru
 ### The Main Features
 - **Extract recipes from any URL**: Paste a link, get a clean recipe
 - **Two-phase "Waterfall" extraction**: Tries structured data first, falls back to smart DOM scraping
+- **Intelligent image selection**: Extracts multiple recipe images with smart carousel (NEW!)
 - **Confidence scoring**: Every extraction gets a 0-100 reliability score with detailed breakdown
 - **Works on protected sites**: Built-in bot-detection evasion gets past most blocks
 - **Clean, readable interface**: "Warm paper" aesthetic—like a cookbook, not a dashboard
@@ -81,6 +82,59 @@ Logs include score breakdowns by factor:
 [2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 85/100 (HIGH) | 
 Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+5
 ```
+
+---
+
+### Smart Image Selection Carousel
+
+CleanPlate extracts **multiple high-quality recipe images** from each page and presents them in an interactive carousel, letting you choose the best one.
+
+**How It Works**:
+1. **Backend extraction** scans the page for up to 3 recipe images
+2. **Smart scoring** ranks images based on:
+   - Source (structured data = 100 pts)
+   - Filename keywords ("recipe", "food", "dish" = +30 pts)
+   - Descriptive alt text (+20 pts)
+   - Large dimensions (>600px = +15 pts)
+3. **Carousel UI** appears when 2+ candidates are found
+4. **User preference** saved to localStorage for future visits (30-day expiration)
+
+**User Experience**:
+- Navigate with **arrow buttons** or **keyboard** (←, →, Enter)
+- See current position with **counter** ("2 / 3")
+- Click **"Use This Image"** to confirm selection
+- Choice persists across sessions for the same recipe URL
+
+**Example Output**:
+```json
+{
+  "imageCandidates": [
+    {
+      "url": "https://example.com/recipe-hero.jpg",
+      "score": 100,
+      "source": "structured-data",
+      "alt": "Chocolate chip cookies on a cooling rack"
+    },
+    {
+      "url": "https://example.com/step-by-step.jpg",
+      "score": 95,
+      "source": "dom",
+      "alt": "Ingredients for chocolate chip cookies"
+    }
+  ]
+}
+```
+
+**Testing**:
+```bash
+# Test image extraction
+php tests/test-image-candidates.php
+
+# View in browser
+# http://localhost:8080/tests/test-image-candidates.php
+```
+
+See [IMAGE_CAROUSEL_IMPLEMENTATION.md](IMAGE_CAROUSEL_IMPLEMENTATION.md) for full technical documentation.
 
 ---
 

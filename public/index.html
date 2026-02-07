@@ -98,6 +98,37 @@
                     <div id="recipe-image-container" class="recipe-image-container" style="display: none;">
                         <img id="recipe-image" class="recipe-image" alt="Recipe" />
                     </div>
+
+                    <!-- Image Carousel for Multiple Image Candidates -->
+                    <div id="image-carousel" class="image-carousel" style="display: none;">
+                        <div class="carousel-header">
+                            <h4>Choose Recipe Image</h4>
+                            <p class="carousel-hint">Browse available images and select your preferred one</p>
+                        </div>
+                        
+                        <div class="carousel-content">
+                            <button id="carousel-prev" class="carousel-nav carousel-nav-prev" aria-label="Previous image">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            
+                            <div class="carousel-image-container">
+                                <img id="carousel-image" class="carousel-image" alt="Recipe image candidate" />
+                                <div class="carousel-counter" id="carousel-counter">1 / 3</div>
+                            </div>
+                            
+                            <button id="carousel-next" class="carousel-nav carousel-nav-next" aria-label="Next image">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <button id="carousel-confirm" class="carousel-confirm">
+                            Use This Image
+                        </button>
+                    </div>
                 </div>
 
                 <div class="confidence-container" style="display: none;" id="confidence-container">
