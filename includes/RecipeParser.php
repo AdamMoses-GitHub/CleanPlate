@@ -858,17 +858,34 @@ class RecipeParser {
      * Helper: Format ISO 8601 duration to readable format
      */
     private function formatDuration($duration) {
-        if (!is_string($duration) || !preg_match('/^PT/', $duration)) {
+        if (!is_string($duration) || !preg_match('/^P/', $duration)) {
             return $duration;
         }
         
         $result = [];
         
-        if (preg_match('/(\d+)H/', $duration, $matches)) {
-            $result[] = $matches[1] . ' hour' . ($matches[1] > 1 ? 's' : '');
+        // Extract days (before T)
+        if (preg_match('/(\d+)D/', $duration, $matches)) {
+            $days = intval($matches[1]);
+            if ($days > 0) {
+                $result[] = $days . ' day' . ($days > 1 ? 's' : '');
+            }
         }
-        if (preg_match('/(\d+)M/', $duration, $matches)) {
-            $result[] = $matches[1] . ' minute' . ($matches[1] > 1 ? 's' : '');
+        
+        // Extract hours (after T)
+        if (preg_match('/T.*?(\d+)H/', $duration, $matches)) {
+            $hours = intval($matches[1]);
+            if ($hours > 0) {
+                $result[] = $hours . ' hour' . ($hours > 1 ? 's' : '');
+            }
+        }
+        
+        // Extract minutes (after T, careful not to confuse with months)
+        if (preg_match('/T.*?(\d+)M/', $duration, $matches)) {
+            $minutes = intval($matches[1]);
+            if ($minutes > 0) {
+                $result[] = $minutes . ' minute' . ($minutes > 1 ? 's' : '');
+            }
         }
         
         return empty($result) ? $duration : implode(' ', $result);
