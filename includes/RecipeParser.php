@@ -266,7 +266,9 @@ class RecipeParser {
         
         // Extract ingredients
         if (isset($recipe['recipeIngredient']) && is_array($recipe['recipeIngredient'])) {
-            $normalized['ingredients'] = array_map([$this, 'cleanText'], $recipe['recipeIngredient']);
+            $normalized['ingredients'] = array_map(function($ingredient) {
+                return $this->formatIngredientQuantities($this->cleanText($ingredient));
+            }, $recipe['recipeIngredient']);
         }
         
         // Extract instructions
@@ -802,7 +804,7 @@ class RecipeParser {
             $items = $xpath->query(".//li | .//span[@class] | .//p", $container);
             
             foreach ($items as $item) {
-                $text = $this->cleanText($item->textContent);
+                $text = $this->formatIngredientQuantities($this->cleanText($item->textContent));
                 if (!empty($text) && strlen($text) > 2 && strlen($text) < 500) {
                     $ingredients[] = $text;
                 }
@@ -993,5 +995,73 @@ class RecipeParser {
         $text = trim($text);
         
         return $text;
+    }
+    
+    /**
+     * Format ingredient quantities by converting decimals to fractions
+     * 
+     * @param string $ingredient Ingredient text
+     * @return string Formatted ingredient text
+     */
+    private function formatIngredientQuantities($ingredient) {
+        if (!is_string($ingredient)) {
+            return $ingredient;
+        }
+        
+        // Replace long decimals and common fraction decimals with fractions
+        $ingredient = preg_replace_callback(
+            '/\b(\d+\.)?(\d{3,})\b/',
+            function($matches) {
+                $full = $matches[0];
+                $decimal = floatval($full);
+                
+                // Convert to fraction if it's a common one
+                $fraction = $this->decimalToFraction($decimal);
+                return $fraction !== null ? $fraction : number_format($decimal, 2);
+            },
+            $ingredient
+        );
+        
+        return $ingredient;
+    }
+    
+    /**
+     * Convert decimal to common fraction
+     * 
+     * @param float $decimal Decimal value
+     * @return string|null Fraction string or null if no match
+     */
+    private function decimalToFraction($decimal) {
+        // Common cooking fractions with tolerance
+        $fractions = [
+            0.125 => '1/8',
+            0.166667 => '1/6',
+            0.2 => '1/5',
+            0.25 => '1/4',
+            0.333333 => '1/3',
+            0.375 => '3/8',
+            0.4 => '2/5',
+            0.5 => '1/2',
+            0.6 => '3/5',
+            0.625 => '5/8',
+            0.666667 => '2/3',
+            0.75 => '3/4',
+            0.8 => '4/5',
+            0.833333 => '5/6',
+            0.875 => '7/8',
+        ];
+        
+        // Extract whole number and fractional part
+        $whole = floor($decimal);
+        $frac = $decimal - $whole;
+        
+        // Find matching fraction (within 0.01 tolerance)
+        foreach ($fractions as $value => $fraction) {
+            if (abs($frac - $value) < 0.01) {
+                return $whole > 0 ? $whole . ' ' . $fraction : $fraction;
+            }
+        }
+        
+        return null;
     }
 }
