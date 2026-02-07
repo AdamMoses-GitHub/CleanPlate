@@ -677,7 +677,7 @@ const UI = {
 
     renderIngredients(ingredients) {
         if (!Array.isArray(ingredients) || ingredients.length === 0) {
-            this.elements.ingredientsList.innerHTML = '<li><button class="ingredient-checkbox" disabled></button><span class="ingredient-text">No ingredients found</span></li>';
+            this.elements.ingredientsList.innerHTML = '<li><span class="ingredient-checkbox"></span><span class="ingredient-text">No ingredients found</span></li>';
             return;
         }
 
@@ -689,21 +689,11 @@ const UI = {
             
             return `
                 <li>
-                    <button class="ingredient-checkbox" data-index="${index}"></button>
+                    <span class="ingredient-checkbox"></span>
                     <span class="ingredient-text">${this.escapeHtml(text)}</span>
                 </li>
             `;
         }).join('');
-
-        // Add checkbox click handlers
-        this.elements.ingredientsList.querySelectorAll('.ingredient-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('click', (e) => {
-                e.preventDefault();
-                checkbox.classList.toggle('checked');
-                const textSpan = checkbox.nextElementSibling;
-                textSpan.classList.toggle('checked');
-            });
-        });
     },
 
     renderInstructions(instructions) {
@@ -748,9 +738,7 @@ const UI = {
     copyIngredientsToClipboard() {
         const ingredients = [];
         this.elements.ingredientsList.querySelectorAll('.ingredient-text').forEach(span => {
-            if (!span.classList.contains('checked')) {
-                ingredients.push(span.textContent);
-            }
+            ingredients.push(span.textContent);
         });
 
         const text = ingredients.join('\n');
