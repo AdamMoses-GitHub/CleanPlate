@@ -9,7 +9,9 @@ Complete guide from installation to power-user workflows.
 CleanPlate allows you to:
 - **Extract recipes from any URL** using intelligent two-phase parsing
 - **Bypass bot-detection systems** on major recipe sites (AllRecipes, FoodNetwork, etc.)
-- **Get clean, structured output** (ingredients, instructions, metadata)
+- **Get clean, structured output** with automatic junk removal (navigation, headers, etc.)
+- **View confidence scores** (0-100) to assess extraction reliability
+- **Run comprehensive tests** in CLI or web browser with visual interface
 - **Run locally or deploy to shared hosting** (no special server requirements)
 - **Diagnose issues** with the built-in system check tool
 
@@ -244,65 +246,83 @@ cleanplate/
 ├── LICENSE                    # MIT license
 ├── README.md                  # Marketing overview
 ├── INSTALL_AND_USAGE.md       # This file
-├── parser.php                 # API endpoint (187 lines)
+├── api/
+│   └── parser.php             # JSON API endpoint (255 lines)
 │                              # - Rate limiting (session-based)
 │                              # - SSRF protection
 │                              # - Error mapping
-├── system-check.php           # Diagnostic tool (505 lines)
-│                              # - PHP version check
-│                              # - Extension verification
-│                              # - File permission tests
-├── test-scraper.php           # Test harness for manual extraction tests
 ├── includes/
-│   └── RecipeParser.php       # Core extraction engine (490 lines)
-│                              # - fetchUrl(): cURL with bot-evasion headers
-│                              # - extractFromJsonLd(): Phase 1 parser
-│                              # - extractFromDom(): Phase 2 DOM scraper
-│                              # - normalizeRecipeData(): Format converter
-└── public/
-    ├── index.html             # Main UI (73 lines)
-    │                          # - Form input
-    │                          # - Recipe card display
-    │                          # - Error/toast notifications
-    ├── css/
-    │   └── style.css          # Warm paper aesthetic (373 lines)
-    │                          # - CSS custom properties for theming
-    │                          # - Serif headings, sans-serif body
-    │                          # - Paper texture background
-    └── js/
-        └── app.js             # Client logic (300 lines)
-                               # - RecipeState object (state management)
-                               # - CleanPlateAPI class (fetch wrapper)
-                               # - DOM rendering functions
+│   ├── RecipeParser.php       # Core extraction engine (952 lines)
+│   │                          # - fetchUrl(): cURL with bot-evasion headers
+│   │                          # - extractFromJsonLd(): Phase 1 parser
+│   │                          # - extractFromDom(): Phase 2 DOM scraper
+│   │                          # - normalizeRecipeData(): Format converter
+│   └── IngredientFilter.php   # Post-processing filter (411 lines)
+│                              # - Pattern-based junk removal
+│                              # - Navigation/header detection
+│                              # - Quality ratio tracking
+├── public/
+│   ├── index.html             # Main UI (73 lines)
+│   │                          # - Form input
+│   │                          # - Recipe card display
+│   │                          # - Error/toast notifications
+│   ├── css/
+│   │   └── style.css          # Warm paper aesthetic (373 lines)
+│   │                          # - CSS custom properties for theming
+│   │                          # - Serif headings, sans-serif body
+│   │                          # - Paper texture background
+│   └── js/
+│       └── app.js             # Client logic (300 lines)
+│                              # - RecipeState object (state management)
+│                              # - CleanPlateAPI class (fetch wrapper)
+│                              # - DOM rendering functions
+└── tests/
+    ├── index.html             # Visual test suite interface (345 lines)
+    ├── system-check.php       # Diagnostic tool (508 lines)
+    │                          # - PHP version check
+    │                          # - Extension verification
+    │                          # - File permission tests
+    ├── test-scraper.php       # Recipe extraction test harness (322 lines)
+    ├── test-confidence-scoring.php  # Confidence algorithm tests (603 lines)
+    ├── test-ingredient-filter.php   # Post-processing filter tests (481 lines)
+    └── test-security.php      # Security validation tests (248 lines)
 ```
 
 ### Key Directories
 
-- **`includes/`**: Backend parsing logic. `RecipeParser.php` contains the two-phase waterfall algorithm.
-- **`public/`**: Static frontend files. Safe to expose to the internet.
-- **Root directory**: API endpoint (`parser.php`) and utility scripts.
+- **`api/`**: JSON endpoint for recipe extraction. Contains `parser.php` with rate limiting and SSRF protection.
+- **`includes/`**: Core backend classes. `RecipeParser.php` (two-phase waterfall) and `IngredientFilter.php` (post-processing).
+- **`public/`**: Static frontend files (HTML/CSS/JS). Safe to expose to the internet.
+- **`tests/`**: Test suite with dual CLI/web execution. Includes visual interface at `tests/index.html`.
 
 ### Tests & Style
-
-**Run system diagnostics**:
+Visual test suite** (recommended):
 ```bash
 php -S localhost:8080
-# Open: http://localhost:8080/tests/system-check.php
-# Or visit: http://localhost:8080/tests/ for test suite index
+# Open: http://localhost:8080/tests/
 ```
-The system check validates:
-- PHP version (7.4+)
-- Required extensions (curl, dom, json, mbstring, libxml)
-- File permissions
-- Directory structure
-- Session functionality
-- cURL connectivity
+The test suite interface provides cards for all available tests with "Run in Browser" buttons.
 
-**Manual recipe test**:
+**CLI mode** (for automation):
 ```bash
-php tests/test-scraper.php "https://www.allrecipes.com/recipe/12345/"
+php tests/system-check.php                           # System diagnostics
+php tests/test-scraper.php "https://example.com"     # Recipe extraction
+php tests/test-confidence-scoring.php                # Confidence algorithm
+php tests/test-ingredient-filter.php                 # Post-processing filter
+php tests/test-security.php                          # Security validation
 ```
-This bypasses the web interface and directly invokes `RecipeParser::parse()`.
+
+**Web mode** (for visual debugging):
+```bash
+# Start server: php -S localhost:8080
+http://localhost:8080/tests/system-check.php
+http://localhost:8080/tests/test-scraper.php?url=https://example.com
+http://localhost:8080/tests/test-confidence-scoring.php
+http://localhost:8080/tests/test-ingredient-filter.php?debug=1
+http://localhost:8080/tests/test-security.php
+```
+
+All test files support both CLI and web execution with automatic detection. Use `--debug` flag (CLI) or `?debug=1` parameter (web) for verbose output.
 
 **Code style guidelines**:
 - PHP: PSR-2 (implied, not enforced)
@@ -388,7 +408,7 @@ private $userAgents = [
 
 ### Disable SSRF Protection (NOT recommended)
 
-Comment out lines 60-66 in [parser.php](parser.php):
+Comment out lines 60-66 in [api/parser.php](api/parser.php):
 ```php
 // if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
 //     respondWithError(403, 'FORBIDDEN', 'Cannot access internal or private network addresses.');

@@ -1,6 +1,6 @@
 # CleanPlate
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg) ![PHP](https://img.shields.io/badge/PHP-7.4+-777BB4.svg?logo=php) ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg) ![PHP](https://img.shields.io/badge/PHP-7.4+-777BB4.svg?logo=php) ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 *Because copying recipes from blogs with 17 popups and a life story is like peeling an onion while being interviewed about your childhood.*
 
@@ -26,13 +26,16 @@ The **solution**: CleanPlate extracts the actual recipe—ingredients and instru
 - **Clean, readable interface**: "Warm paper" aesthetic—like a cookbook, not a dashboard
 - **Instant results**: No loading spinners that make you question reality
 - **Actionable error messages**: When it fails, it tells you why and what to try next
+- **Comprehensive test suite**: Run tests in CLI or web browser with visual interface
 
 ### The Nerdy Stuff
 - **JSON-LD structured data parsing** (Phase 1) with 95%+ accuracy on modern recipe sites
-- **Heuristic DOM fallback** (Phase 2) for legacy/non-compliant sites
+- **Pattern-based filtering**: Removes "Home", "Share", "Ingredients:", and other junk automatically
 - **Anti-bot measures**: User-agent rotation, HTTP/2, cookie persistence, referer spoofing
-- **SSRF protection**: Blocks internal/private IP ranges
+- **SSRF protection**: Blocks internal/private IP ranges, localhost, link-local addresses
 - **Session-based rate limiting**: 10 requests/minute, 2-second per-domain delays
+- **Zero external dependencies**: Pure PHP + vanilla JavaScript
+- **Dual-mode testing**: All tests run in CLI or web browser per-domain delays
 - **Zero external dependencies**: Pure PHP + vanilla JavaScript
 
 ### Confidence Scoring
@@ -219,7 +222,66 @@ CleanPlate implements multiple security layers:
 3. Configure `php.ini` security settings
 4. Run security validation: `php tests/test-security.php`
 
-For security issues, please see [SECURITY.md](SECURITY.md) if you'd like to report vulnerabilities responsibly.
+For security issues, please see [SECURITY.md](SECURITY.md) to report vulnerabilities responsibly.
+
+---
+
+## Development & Testing
+
+### Test Suite
+
+CleanPlate includes a comprehensive test suite with **dual-mode execution** (CLI or web browser):
+
+**Web Interface**: Visit `http://localhost:8080/tests/`
+- Visual test suite with "Run in Browser" buttons
+- Formatted output with syntax highlighting
+- Real-time test results
+
+**CLI Mode**:
+```bash
+# System diagnostics
+php tests/system-check.php
+
+# Recipe extraction tests
+php tests/test-scraper.php
+php tests/test-scraper.php "https://example.com/recipe" --debug
+
+# Confidence scoring tests
+php tests/test-confidence-scoring.php
+
+# Post-processing filter tests
+php tests/test-ingredient-filter.php --debug
+
+# Security validation
+php tests/test-security.php
+```
+
+**Web Mode**:
+```
+http://localhost:8080/tests/system-check.php
+http://localhost:8080/tests/test-scraper.php?url=https://example.com&debug=1
+http://localhost:8080/tests/test-confidence-scoring.php
+http://localhost:8080/tests/test-ingredient-filter.php?debug=1
+http://localhost:8080/tests/test-security.php
+```
+
+### Debug Logging
+
+Enable confidence score debugging:
+
+```bash
+# API mode
+CONFIDENCE_DEBUG=1 php -S localhost:8080
+
+# Test harness
+php tests/test-scraper.php --debug
+```
+
+Logs include score breakdowns by factor:
+```
+[2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 87/100 (HIGH) | 
+Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+7
+```
 
 ---
 
