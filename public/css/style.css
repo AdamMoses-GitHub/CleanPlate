@@ -568,14 +568,29 @@ header {
 }
 
 .recipe-source {
-    margin-top: 0.5rem;
-    font-size: 0.95rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
     color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.recipe-source .source-label {
+    font-weight: 500;
 }
 
 .recipe-source a {
-    color: var(--color-accent);
+    color: var(--primary-color);
     text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.recipe-source a:hover {
+    color: #6d28d9;
+    text-decoration: underline;
 }
 
 .recipe-source a:hover {

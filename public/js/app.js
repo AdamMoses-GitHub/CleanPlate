@@ -304,6 +304,8 @@ const UI = {
         recipeTitle: document.getElementById('recipe-title'),
         titleEditBtn: document.getElementById('title-edit-btn'),
         recipeMetadata: document.getElementById('recipe-metadata'),
+        recipeSource: document.getElementById('recipe-source'),
+        recipeSourceLink: document.getElementById('recipe-source-link'),
         ingredientsList: document.getElementById('ingredients-list'),
         instructionsList: document.getElementById('instructions-list'),
         copyIngredientsBtn: document.getElementById('copy-ingredients-btn'),
@@ -389,6 +391,13 @@ const UI = {
         // Set title
         const savedTitle = this.getSavedTitle(this.currentRecipeUrl);
         this.elements.recipeTitle.textContent = savedTitle || data.title || 'Untitled Recipe';
+
+        // Set source link
+        if (data.source && data.source.url) {
+            this.renderSourceLink(data.source.url);
+        } else {
+            this.elements.recipeSource.style.display = 'none';
+        }
 
         // Set metadata if available
         if (data.metadata) {
@@ -721,6 +730,19 @@ const UI = {
         this.elements.recipeImage.src = imageUrl;
         this.elements.recipeImage.alt = altText || this.elements.recipeTitle.textContent || 'Recipe';
         this.elements.recipeImageContainer.style.display = 'block';
+    },
+
+    renderSourceLink(url) {
+        try {
+            const urlObj = new URL(url);
+            const domain = urlObj.hostname.replace(/^www\./, '');
+            
+            this.elements.recipeSourceLink.href = url;
+            this.elements.recipeSourceLink.textContent = domain;
+            this.elements.recipeSource.style.display = 'block';
+        } catch (e) {
+            this.elements.recipeSource.style.display = 'none';
+        }
     },
 
     copyIngredientsToClipboard() {
