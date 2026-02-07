@@ -57,6 +57,7 @@ class ImageCarousel {
         this.elements.carouselPrev.addEventListener('click', () => this.prev());
         this.elements.carouselNext.addEventListener('click', () => this.next());
         this.elements.carouselConfirm.addEventListener('click', () => this.selectCurrent());
+        this.elements.carouselHide.addEventListener('click', () => this.hideImage());
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
@@ -68,7 +69,7 @@ class ImageCarousel {
         });
     }
 
-    init(imageCandidates, recipeUrl) {
+    init(imageCandidates, recipeUrl, autoShow = true) {
         if (!imageCandidates || imageCandidates.length <= 1) {
             this.hide();
             return false;
@@ -81,13 +82,20 @@ class ImageCarousel {
         const savedIndex = this.getSavedImageIndex();
         this.currentIndex = savedIndex !== null ? savedIndex : 0;
 
-        this.show();
+        if (autoShow) {
+            this.show();
+        }
         return true;
     }
 
     show() {
         if (this.images.length === 0) return;
 
+        // Hide image container and hidden banner
+        this.elements.recipeImageContainer.style.display = 'none';
+        this.elements.imageHiddenBanner.style.display = 'none';
+        
+        // Show carousel
         this.elements.imageCarousel.style.display = 'block';
         this.updateDisplay();
     }
@@ -135,13 +143,31 @@ class ImageCarousel {
         this.elements.recipeImage.src = selected.url;
         this.elements.recipeImage.alt = selected.alt || 'Recipe';
         this.elements.recipeImageContainer.style.display = 'block';
+        this.elements.imageHiddenBanner.style.display = 'none';
         
         // Hide carousel
         this.hide();
         
         // Show toast notification
         if (UI.showToast) {
-            UI.showToast('Image selected!', 2000);
+            UI.showToast('Image updated!', 2000);
+        }
+    }
+
+    hideImage() {
+        // Save "no image" preference to localStorage
+        this.saveNoImagePreference();
+        
+        // Hide the image container and show banner
+        this.elements.recipeImageContainer.style.display = 'none';
+        this.elements.imageHiddenBanner.style.display = 'flex';
+        
+        // Hide carousel
+        this.hide();
+        
+        // Show toast notification
+        if (UI.showToast) {
+            UI.showToast('Image hidden', 2000);
         }
     }
 
@@ -153,11 +179,27 @@ class ImageCarousel {
             const preference = {
                 index: index,
                 url: this.images[index].url,
+                hidden: false,
                 timestamp: Date.now()
             };
             localStorage.setItem(key, JSON.stringify(preference));
         } catch (e) {
             console.warn('Failed to save image preference:', e);
+        }
+    }
+
+    saveNoImagePreference() {
+        if (!this.recipeUrl) return;
+        
+        try {
+            const key = `cleanplate_image_${this.getUrlHash(this.recipeUrl)}`;
+            const preference = {
+                hidden: true,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(key, JSON.stringify(preference));
+        } catch (e) {
+            console.warn('Failed to save no image preference:', e);
         }
     }
 
@@ -175,8 +217,13 @@ class ImageCarousel {
                 const age = Date.now() - preference.timestamp;
                 const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
                 
-                if (age < maxAge && preference.index < this.images.length) {
-                    return preference.index;
+                if (age < maxAge) {
+                    if (preference.hidden) {
+                        return 'hidden';
+                    }
+                    if (preference.index < this.images.length) {
+                        return preference.index;
+                    }
                 }
             }
         } catch (e) {
@@ -262,12 +309,16 @@ const UI = {
         printBtn: document.getElementById('print-btn'),
         recipeImageContainer: document.getElementById('recipe-image-container'),
         recipeImage: document.getElementById('recipe-image'),
+        imageSelectorBtn: document.getElementById('image-selector-btn'),
+        imageHiddenBanner: document.getElementById('image-hidden-banner'),
+        imageHiddenChange: document.getElementById('image-hidden-change'),
         imageCarousel: document.getElementById('image-carousel'),
         carouselImage: document.getElementById('carousel-image'),
         carouselCounter: document.getElementById('carousel-counter'),
         carouselPrev: document.getElementById('carousel-prev'),
         carouselNext: document.getElementById('carousel-next'),
         carouselConfirm: document.getElementById('carousel-confirm'),
+        carouselHide: document.getElementById('carousel-hide'),
         toast: document.getElementById('toast-notification')
     },
 
@@ -352,13 +403,30 @@ const UI = {
         const primaryImage = data.metadata && data.metadata.imageUrl ? data.metadata.imageUrl : null;
         
         if (imageCandidates.length > 1) {
-            // Show carousel for multiple image candidates
-            const carousel = new ImageCarousel(this.elements);
+            // Multiple candidates - auto-select best (first) and show selector button
             const recipeUrl = data.source ? data.source.url : '';
-            carousel.init(imageCandidates, recipeUrl);
+            const carousel = new ImageCarousel(this.elements);
+            carousel.init(imageCandidates, recipeUrl, false); // Don't auto-show carousel
+            
+            // Check for saved preference
+            const savedPreference = carousel.getSavedImageIndex();
+            
+            if (savedPreference === 'hidden') {
+                // User chose to hide image - show placeholder banner
+                this.elements.recipeImageContainer.style.display = 'none';
+                this.elements.imageHiddenBanner.style.display = 'flex';
+            } else {
+                // Show selected image or default to first
+                const selectedImage = savedPreference !== null ? imageCandidates[savedPreference] : imageCandidates[0];
+                this.renderImage(selectedImage.url, selectedImage.alt);
+                this.elements.imageSelectorBtn.style.display = 'block';
+            }
+            
+            // Store carousel instance for selector button
+            this.currentCarousel = carousel;
         } else if (imageCandidates.length === 1) {
             // Single candidate - display directly
-            this.renderImage(imageCandidates[0].url);
+            this.renderImage(imageCandidates[0].url, imageCandidates[0].alt);
         } else if (primaryImage) {
             // Fallback to primary image from metadata
             this.renderImage(primaryImage);
@@ -387,8 +455,13 @@ const UI = {
         this.elements.confidenceDetails.style.display = 'none';
         this.elements.confidenceToggle.classList.remove('open');
         
-        // Hide image carousel
+        // Reset image display state
         this.elements.imageCarousel.style.display = 'none';
+        this.elements.recipeImageContainer.style.display = 'none';
+        this.elements.recipeImage.src = '';
+        this.elements.imageSelectorBtn.style.display = 'none';
+        this.elements.imageHiddenBanner.style.display = 'none';
+        this.currentCarousel = null;
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -632,9 +705,9 @@ const UI = {
         }).join('');
     },
 
-    renderImage(imageUrl) {
+    renderImage(imageUrl, altText = null) {
         this.elements.recipeImage.src = imageUrl;
-        this.elements.recipeImage.alt = this.elements.recipeTitle.textContent || 'Recipe';
+        this.elements.recipeImage.alt = altText || this.elements.recipeTitle.textContent || 'Recipe';
         this.elements.recipeImageContainer.style.display = 'block';
     },
 
@@ -688,6 +761,20 @@ class CleanPlateApp {
         // Bind print button
         UI.elements.printBtn.addEventListener('click', () => {
             window.print();
+        });
+
+        // Bind image selector button
+        UI.elements.imageSelectorBtn.addEventListener('click', () => {
+            if (UI.currentCarousel) {
+                UI.currentCarousel.show();
+            }
+        });
+
+        // Bind image hidden change button
+        UI.elements.imageHiddenChange.addEventListener('click', () => {
+            if (UI.currentCarousel) {
+                UI.currentCarousel.show();
+            }
         });
 
         // Bind confidence toggle button
