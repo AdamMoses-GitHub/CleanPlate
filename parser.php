@@ -9,6 +9,21 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Don't display errors to client
 ini_set('log_errors', 1);
 
+// Configuration: Enable confidence score logging
+// Set CONFIDENCE_DEBUG environment variable or edit this variable to enable logging
+// 
+// Example usage:
+//   - Set environment variable: CONFIDENCE_DEBUG=1
+//   - Or edit this file: $debugConfidenceScoring = true;
+// 
+// Log format example:
+//   [2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 85/100 (HIGH) | 
+//   Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+5
+// 
+$debugConfidenceScoring = getenv('CONFIDENCE_DEBUG') !== false 
+    ? (bool)getenv('CONFIDENCE_DEBUG') 
+    : false;
+
 // Set execution timeout
 set_time_limit(30);
 
@@ -98,7 +113,8 @@ $_SESSION['api_requests'][] = $now;
 
 // Parse the recipe
 try {
-    $parser = new RecipeParser();
+    // Enable debug logging if configured
+    $parser = new RecipeParser($debugConfidenceScoring);
     $result = $parser->parse($url);
     
     respondWithSuccess($result);

@@ -10,42 +10,101 @@
     <div class="container">
         <header>
             <h1>CleanPlate</h1>
-            <p class="tagline">Extract recipes from any website</p>
+            <p class="tagline">Extract recipes from messy blog URLs.<br>Just ingredients and instructions, nothing else.</p>
         </header>
 
         <main>
-            <section class="input-section">
-                <form id="parse-form">
-                    <div class="input-group">
-                        <input 
-                            type="url" 
-                            id="url-input" 
-                            placeholder="Paste recipe URL here..." 
-                            required
-                            autocomplete="url"
-                        >
-                        <button type="submit" id="parse-btn">
-                            <span class="btn-text">Extract Recipe</span>
-                            <span class="btn-loading" style="display: none;">Processing...</span>
-                        </button>
+            <section id="landing-view" class="landing-view">
+                <div class="input-section">
+                    <form id="parse-form">
+                        <div class="input-group">
+                            <input 
+                                type="url" 
+                                id="url-input" 
+                                placeholder="Paste a recipe URL here..." 
+                                required
+                                autocomplete="url"
+                            >
+                            <button type="submit" id="parse-btn">
+                                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="M21 21l-4.35-4.35"></path>
+                                </svg>
+                                <span class="btn-text">Extract</span>
+                                <span class="btn-loading" style="display: none;">Processing...</span>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="popular-sites">
+                        <p class="popular-label">Try with popular recipe sites:</p>
+                        <div class="site-buttons">
+                            <span class="site-badge">AllRecipes</span>
+                            <span class="site-badge">Food Network</span>
+                            <span class="site-badge">Bon Appétit</span>
+                            <span class="site-badge">NYT Cooking</span>
+                            <span class="site-badge">Serious Eats</span>
+                        </div>
                     </div>
-                </form>
+                </div>
+
+                <div id="error-message" class="error-container" style="display: none;"></div>
             </section>
 
-            <div id="error-message" class="error-container" style="display: none;"></div>
             <div id="toast-notification" class="toast" style="display: none;"></div>
 
-            <section id="recipe-display" class="recipe-container" style="display: none;">
+            <section id="recipe-display" class="recipe-view" style="display: none;">
+                <button id="back-button" class="back-button no-print">
+                    <span class="arrow">←</span>
+                    <span>Extract another recipe</span>
+                </button>
+
                 <div class="recipe-card">
-                    <div class="recipe-header">
-                        <h2 id="recipe-title"></h2>
-                        <p class="recipe-source">
-                            <span>Source: </span>
-                            <a id="recipe-url" href="#" target="_blank" rel="noopener noreferrer"></a>
-                        </p>
+                    <div class="confidence-container" style="display: none;" id="confidence-container">
+                        <div id="confidence-badge" class="confidence-badge"></div>
+                        <button id="confidence-toggle" class="confidence-toggle no-print" title="Show details">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div id="confidence-details" class="confidence-details no-print" style="display: none;">
+                        <table class="confidence-table">
+                            <thead>
+                                <tr>
+                                    <th>Factor</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confidence-details-body">
+                            </tbody>
+                        </table>
                     </div>
 
-                    <div class="recipe-metadata" id="recipe-metadata"></div>
+                    <div class="recipe-header">
+                        <h2 id="recipe-title"></h2>
+                        <div class="recipe-metadata" id="recipe-metadata"></div>
+                    </div>
+
+                    <div class="action-buttons no-print">
+                        <button id="copy-ingredients-btn" class="action-btn action-btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy Ingredients</span>
+                        </button>
+                        <button id="print-btn" class="action-btn action-btn-secondary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                <rect x="6" y="14" width="12" height="8"></rect>
+                            </svg>
+                            <span>Print</span>
+                        </button>
+                    </div>
 
                     <div class="recipe-content">
                         <div class="recipe-section">
@@ -57,6 +116,10 @@
                             <h3>Instructions</h3>
                             <ol id="instructions-list" class="instructions-list"></ol>
                         </div>
+                    </div>
+
+                    <div id="recipe-image-container" class="recipe-image-container" style="display: none;">
+                        <img id="recipe-image" class="recipe-image" alt="Recipe" />
                     </div>
                 </div>
             </section>

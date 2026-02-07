@@ -21,6 +21,14 @@ class RecipeParser {
     
     private $timeout = self::REQUEST_TIMEOUT;
     private $cookieFile = null;
+    private $debugLogging = false;  // Enable to log confidence scores for analysis
+    
+    /**
+     * Constructor - optionally enable debug logging
+     */
+    public function __construct($debugLogging = false) {
+        $this->debugLogging = $debugLogging;
+    }
     
     /**
      * Main parse method - orchestrates the waterfall logic
@@ -37,9 +45,18 @@ class RecipeParser {
         // Phase 1: Try JSON-LD extraction
         $phase1Result = $this->extractFromJsonLd($html, $url);
         if ($phase1Result !== null) {
+            // Calculate confidence score for Phase 1 extraction
+            $confidenceResult = $this->calculateConfidenceScore($phase1Result, 1);
+            
+            // Log confidence score if debug logging is enabled
+            $this->logConfidenceScore($url, 1, $confidenceResult);
+            
             return [
                 'status' => 'success',
                 'phase' => 1,
+                'confidence' => $confidenceResult['score'],
+                'confidenceLevel' => $confidenceResult['level'],
+                'confidenceDetails' => $confidenceResult['factors'],
                 'data' => $phase1Result,
                 'timestamp' => date('c')
             ];
@@ -48,9 +65,18 @@ class RecipeParser {
         // Phase 2: Fallback to DOM extraction
         $phase2Result = $this->extractFromDom($html, $url);
         if ($phase2Result !== null) {
+            // Calculate confidence score for Phase 2 extraction
+            $confidenceResult = $this->calculateConfidenceScore($phase2Result, 2);
+            
+            // Log confidence score if debug logging is enabled
+            $this->logConfidenceScore($url, 2, $confidenceResult);
+            
             return [
                 'status' => 'success',
                 'phase' => 2,
+                'confidence' => $confidenceResult['score'],
+                'confidenceLevel' => $confidenceResult['level'],
+                'confidenceDetails' => $confidenceResult['factors'],
                 'data' => $phase2Result,
                 'timestamp' => date('c')
             ];
@@ -276,7 +302,8 @@ class RecipeParser {
     private function extractFromDom($html, $url) {
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
-        $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        // Use proper UTF-8 encoding without deprecated mb_convert_encoding
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         
         $xpath = new DOMXPath($dom);
@@ -304,6 +331,340 @@ class RecipeParser {
             'ingredients' => $ingredients,
             'instructions' => $instructions,
             'metadata' => []
+        ];
+    }
+    
+    /**
+     * Calculate confidence score for extracted recipe data
+     * 
+     * @param array $data Normalized recipe data
+     * @param int $phase Extraction phase (1 = JSON-LD, 2 = DOM scraping)
+     * @return array ['score' => int, 'level' => string, 'factors' => array]
+     */
+    private function calculateConfidenceScore($data, $phase) {
+        $score = 0;
+        $maxScore = 100;
+        $factors = [];
+        
+        // Validate and normalize phase value
+        // Default to Phase 2 if phase is invalid
+        if (!in_array($phase, [1, 2], true)) {
+            $phase = 2;
+        }
+        
+        // Phase baseline (40 points for Phase 1, 20 for Phase 2)
+        // Structured data (Phase 1) is inherently more reliable
+        $phasePoints = ($phase === 1) ? 40 : 20;
+        $score += $phasePoints;
+        $factors['phase'] = [
+            'value' => $phase,
+            'points' => $phasePoints,
+            'max' => 40
+        ];
+        
+        // Title quality (10 points)
+        // Penalize generic, placeholder, or missing titles
+        $titlePoints = 0;
+        $title = isset($data['title']) ? trim($data['title']) : '';
+        $genericTitles = [
+            'Untitled Recipe', 'Recipe', 'Untitled', '',
+            'No Title', 'Unknown Recipe', 'Recipe Title',
+            'New Recipe', 'Default Recipe'
+        ];
+        
+        // Check if title is non-empty and not a generic placeholder
+        if (!empty($title) && !in_array($title, $genericTitles, true)) {
+            $titlePoints = 10;
+        }
+        $score += $titlePoints;
+        $factors['title'] = [
+            'value' => $title,
+            'points' => $titlePoints,
+            'max' => 10
+        ];
+        
+        // Ingredients (20 points)
+        // Ensure ingredients is an array and count items
+        $ingredients = $data['ingredients'] ?? [];
+        if (!is_array($ingredients)) {
+            $ingredients = [];
+        }
+        $ingredientCount = count($ingredients);
+        $ingredientPoints = 0;
+        if ($ingredientCount >= 5) {
+            $ingredientPoints = 20;
+        } elseif ($ingredientCount >= 2) {
+            $ingredientPoints = 10;
+        }
+        $score += $ingredientPoints;
+        $factors['ingredients'] = [
+            'count' => $ingredientCount,
+            'points' => $ingredientPoints,
+            'max' => 20
+        ];
+        
+        // Instructions (20 points)
+        // Ensure instructions is an array and count steps
+        $instructions = $data['instructions'] ?? [];
+        if (!is_array($instructions)) {
+            $instructions = [];
+        }
+        $instructionCount = count($instructions);
+        $instructionPoints = 0;
+        if ($instructionCount >= 5) {
+            $instructionPoints = 20;
+        } elseif ($instructionCount >= 2) {
+            $instructionPoints = 10;
+        }
+        $score += $instructionPoints;
+        $factors['instructions'] = [
+            'count' => $instructionCount,
+            'points' => $instructionPoints,
+            'max' => 20
+        ];
+        
+        // Metadata completeness (10 points - 2 per field)
+        // Ensure metadata array exists, default to empty array
+        $metadata = $data['metadata'] ?? [];
+        if (!is_array($metadata)) {
+            $metadata = [];
+        }
+        
+        $metadataFields = ['prepTime', 'cookTime', 'totalTime', 'servings', 'imageUrl'];
+        $metadataPresent = 0;
+        $metadataPoints = 0;
+        
+        foreach ($metadataFields as $field) {
+            $value = $metadata[$field] ?? null;
+            
+            // Treat empty strings as missing
+            if (!empty($value) && is_scalar($value)) {
+                $metadataPresent++;
+                $metadataPoints += 2;
+            }
+        }
+        
+        $score += $metadataPoints;
+        $factors['metadata'] = [
+            'fieldsPresent' => $metadataPresent,
+            'fieldsTotal' => count($metadataFields),
+            'points' => $metadataPoints,
+            'max' => 10
+        ];
+        
+        // Quality bonuses and penalties
+        $qualityAdjustments = 0;
+        
+        // Ingredient quality bonus (only if we have ingredients)
+        if ($ingredientCount > 0) {
+            $ingredientQuality = $this->validateIngredientQuality($ingredients);
+            if ($ingredientQuality['hasGoodMeasurements']) {
+                $qualityAdjustments += 5;
+                $factors['ingredientQuality'] = [
+                    'hasMeasurements' => true,
+                    'percentWithMeasurements' => $ingredientQuality['percentWithMeasurements'],
+                    'points' => 5,
+                    'max' => 5
+                ];
+            }
+        }
+        
+        // Instruction quality check (only if we have instructions)
+        if ($instructionCount > 0) {
+            $instructionQuality = $this->validateInstructionQuality($instructions);
+            $qualityAdjustments += $instructionQuality['points'];
+            $factors['instructionQuality'] = [
+                'hasActionVerbs' => $instructionQuality['hasActionVerbs'],
+                'isSingleParagraph' => $instructionQuality['isSingleParagraph'],
+                'points' => $instructionQuality['points'],
+                'max' => 3
+            ];
+        }
+        
+        $score += $qualityAdjustments;
+        $factors['qualityAdjustments'] = [
+            'total' => $qualityAdjustments,
+            'max' => 8
+        ];
+        
+        // Cap score at max
+        $score = min($score, $maxScore);
+        
+        // Determine confidence level based on score thresholds
+        $level = 'low';
+        if ($score >= 80) {
+            $level = 'high';
+        } elseif ($score >= 50) {
+            $level = 'medium';
+        }
+        
+        return [
+            'score' => $score,
+            'level' => $level,
+            'factors' => $factors,
+            'maxScore' => $maxScore
+        ];
+    }
+    
+    /**
+     * Log confidence score for analysis (only if debug logging is enabled)
+     * 
+     * @param string $url Recipe URL
+     * @param int $phase Extraction phase
+     * @param array $confidenceResult Confidence calculation result
+     */
+    private function logConfidenceScore($url, $phase, $confidenceResult) {
+        if (!$this->debugLogging) {
+            return;
+        }
+        
+        $score = $confidenceResult['score'];
+        $level = $confidenceResult['level'];
+        $factors = $confidenceResult['factors'];
+        
+        // Build compact factor breakdown
+        $factorBreakdown = [];
+        if (isset($factors['phase'])) {
+            $factorBreakdown[] = "Phase={$factors['phase']['points']}/{$factors['phase']['max']}";
+        }
+        if (isset($factors['title'])) {
+            $factorBreakdown[] = "Title={$factors['title']['points']}/{$factors['title']['max']}";
+        }
+        if (isset($factors['ingredients'])) {
+            $ing = $factors['ingredients'];
+            $factorBreakdown[] = "Ingredients={$ing['points']}/{$ing['max']}({$ing['count']})";
+        }
+        if (isset($factors['instructions'])) {
+            $inst = $factors['instructions'];
+            $factorBreakdown[] = "Instructions={$inst['points']}/{$inst['max']}({$inst['count']})";
+        }
+        if (isset($factors['metadata'])) {
+            $meta = $factors['metadata'];
+            $factorBreakdown[] = "Metadata={$meta['points']}/{$meta['max']}({$meta['fieldsPresent']}/{$meta['fieldsTotal']})";
+        }
+        if (isset($factors['qualityAdjustments'])) {
+            $qa = $factors['qualityAdjustments'];
+            if ($qa['total'] > 0) {
+                $factorBreakdown[] = "Quality=+{$qa['total']}";
+            }
+        }
+        
+        // Extract domain for easier analysis
+        $domain = parse_url($url, PHP_URL_HOST);
+        
+        // Format: [timestamp] CONFIDENCE | domain | phase | score | level | factors
+        $logMessage = sprintf(
+            "[%s] CONFIDENCE | %s | Phase %d | Score: %d/100 (%s) | %s",
+            date('Y-m-d H:i:s'),
+            $domain,
+            $phase,
+            $score,
+            strtoupper($level),
+            implode(', ', $factorBreakdown)
+        );
+        
+        // Log to error log (typically goes to PHP error log or custom log file)
+        error_log($logMessage);
+    }
+    
+    /**
+     * Validate ingredient quality by checking for measurements
+     * 
+     * @param array $ingredients List of ingredient strings
+     * @return array Quality assessment with percentage and bonus eligibility
+     */
+    private function validateIngredientQuality($ingredients) {
+        if (empty($ingredients)) {
+            return [
+                'hasGoodMeasurements' => false,
+                'percentWithMeasurements' => 0,
+                'count' => 0
+            ];
+        }
+        
+        // Pattern to match common cooking measurements
+        // Includes: numbers, fractions, and common units
+        $measurementPattern = '/\d+\s*(cup|tbsp|tsp|tablespoon|teaspoon|oz|ounce|lb|pound|g|gram|ml|milliliter|kg|kilogram|½|¼|⅓|⅔|¾|⅛|⅜|⅝|⅞)/i';
+        
+        $withMeasurements = 0;
+        foreach ($ingredients as $ingredient) {
+            if (preg_match($measurementPattern, $ingredient)) {
+                $withMeasurements++;
+            }
+        }
+        
+        $total = count($ingredients);
+        $percentage = ($total > 0) ? ($withMeasurements / $total) * 100 : 0;
+        
+        // Award bonus if >70% have measurements
+        $hasGoodMeasurements = $percentage >= 70;
+        
+        return [
+            'hasGoodMeasurements' => $hasGoodMeasurements,
+            'percentWithMeasurements' => round($percentage, 1),
+            'count' => $withMeasurements,
+            'total' => $total
+        ];
+    }
+    
+    /**
+     * Validate instruction quality
+     * 
+     * @param array $instructions List of instruction strings
+     * @return array Quality assessment with points adjustment
+     */
+    private function validateInstructionQuality($instructions) {
+        $points = 0;
+        $hasActionVerbs = false;
+        $isSingleParagraph = false;
+        
+        if (empty($instructions)) {
+            return [
+                'points' => 0,
+                'hasActionVerbs' => false,
+                'isSingleParagraph' => false
+            ];
+        }
+        
+        // Check for single-paragraph instruction (likely parsing error)
+        // Penalize if only 1 instruction but it's very long
+        if (count($instructions) === 1 && strlen($instructions[0]) > 500) {
+            $isSingleParagraph = true;
+            $points -= 5;
+        }
+        
+        // Check for action verbs (indicates well-structured instructions)
+        // Common cooking verbs that suggest proper recipe instructions
+        $actionVerbs = [
+            'mix', 'stir', 'whisk', 'beat', 'fold', 'blend',
+            'bake', 'cook', 'roast', 'grill', 'fry', 'sauté', 'simmer', 'boil',
+            'heat', 'warm', 'cool', 'chill', 'freeze',
+            'chop', 'dice', 'mince', 'slice', 'cut', 'peel', 'grate',
+            'combine', 'add', 'pour', 'place', 'spread', 'layer',
+            'cover', 'wrap', 'seal', 'remove', 'drain', 'rinse'
+        ];
+        
+        $verbPattern = '/\b(' . implode('|', $actionVerbs) . ')\b/i';
+        
+        // Check if instructions contain action verbs
+        $verbCount = 0;
+        foreach ($instructions as $instruction) {
+            if (preg_match($verbPattern, $instruction)) {
+                $verbCount++;
+            }
+        }
+        
+        // Award bonus if majority of instructions have action verbs
+        if ($verbCount >= count($instructions) * 0.5) {
+            $hasActionVerbs = true;
+            $points += 3;
+        }
+        
+        return [
+            'points' => $points,
+            'hasActionVerbs' => $hasActionVerbs,
+            'isSingleParagraph' => $isSingleParagraph,
+            'verbCount' => $verbCount
         ];
     }
     
@@ -436,8 +797,14 @@ class RecipeParser {
      * Initialize session storage for user-agent and domain tracking
      */
     private function initializeSession() {
-        if (session_status() === PHP_SESSION_NONE) {
+        // Only start session if not in CLI mode
+        if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
             session_start();
+        }
+        
+        // Skip session initialization in CLI mode
+        if (php_sapi_name() === 'cli') {
+            return;
         }
         
         // Initialize user-agent storage
@@ -455,12 +822,12 @@ class RecipeParser {
      * Get consistent user-agent for this session
      */
     private function getRandomUserAgent() {
-        if (isset($_SESSION['user_agent'])) {
-            return $_SESSION['user_agent'];
+        // In CLI mode, just return random user-agent
+        if (php_sapi_name() === 'cli' || !isset($_SESSION['user_agent'])) {
+            return $this->userAgents[array_rand($this->userAgents)];
         }
         
-        // Fallback if session not initialized
-        return $this->userAgents[array_rand($this->userAgents)];
+        return $_SESSION['user_agent'];
     }
     
     /**
@@ -469,6 +836,11 @@ class RecipeParser {
     private function enforcePerDomainDelay($url) {
         $domain = parse_url($url, PHP_URL_HOST);
         if (!$domain) {
+            return;
+        }
+        
+        // Skip delay enforcement in CLI mode (for testing)
+        if (php_sapi_name() === 'cli') {
             return;
         }
         

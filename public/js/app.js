@@ -89,13 +89,23 @@ const UI = {
         parseBtn: document.getElementById('parse-btn'),
         btnText: document.querySelector('.btn-text'),
         btnLoading: document.querySelector('.btn-loading'),
+        landingView: document.getElementById('landing-view'),
         errorContainer: document.getElementById('error-message'),
         recipeDisplay: document.getElementById('recipe-display'),
+        backButton: document.getElementById('back-button'),
+        confidenceContainer: document.getElementById('confidence-container'),
+        confidenceBadge: document.getElementById('confidence-badge'),
+        confidenceToggle: document.getElementById('confidence-toggle'),
+        confidenceDetails: document.getElementById('confidence-details'),
+        confidenceDetailsBody: document.getElementById('confidence-details-body'),
         recipeTitle: document.getElementById('recipe-title'),
-        recipeUrl: document.getElementById('recipe-url'),
         recipeMetadata: document.getElementById('recipe-metadata'),
         ingredientsList: document.getElementById('ingredients-list'),
         instructionsList: document.getElementById('instructions-list'),
+        copyIngredientsBtn: document.getElementById('copy-ingredients-btn'),
+        printBtn: document.getElementById('print-btn'),
+        recipeImageContainer: document.getElementById('recipe-image-container'),
+        recipeImage: document.getElementById('recipe-image'),
         toast: document.getElementById('toast-notification')
     },
 
@@ -140,23 +150,33 @@ const UI = {
     },
 
     showRecipe(recipeData) {
-        const { data, phase } = recipeData;
+        const { data, phase, confidence, confidenceLevel, confidenceDetails } = recipeData;
+
+        // Hide landing view, show recipe view
+        this.elements.landingView.style.display = 'none';
+        this.elements.recipeDisplay.style.display = 'block';
+        this.elements.recipeDisplay.classList.add('active');
+
+        // Show confidence badge with score
+        // Use confidenceLevel if available, fallback to phase-based detection
+        const level = confidenceLevel || (phase === 1 ? 'high' : 'medium');
+        const score = confidence || null;
+        this.showConfidenceBadge(level, score, confidenceDetails);
 
         // Show fallback toast if Phase 2 was used
         if (phase === 2) {
             this.showToast('Using deep-scan mode for this site.');
         }
 
-        // Set title and source
+        // Set title
         this.elements.recipeTitle.textContent = data.title || 'Untitled Recipe';
-        this.elements.recipeUrl.textContent = data.source?.siteName || data.source?.url || 'Unknown Source';
-        this.elements.recipeUrl.href = data.source?.url || '#';
 
         // Set metadata if available
         if (data.metadata) {
             this.renderMetadata(data.metadata);
         } else {
             this.elements.recipeMetadata.innerHTML = '';
+            this.elements.recipeMetadata.style.display = 'none';
         }
 
         // Render ingredients
@@ -165,25 +185,207 @@ const UI = {
         // Render instructions
         this.renderInstructions(data.instructions || []);
 
+        // Render image if available
+        if (data.image) {
+            this.renderImage(data.image);
+        } else {
+            this.elements.recipeImageContainer.style.display = 'none';
+        }
+
         // Show recipe display
         this.elements.recipeDisplay.style.display = 'block';
         this.elements.errorContainer.style.display = 'none';
 
-        // Scroll to recipe
-        this.elements.recipeDisplay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    hideRecipe() {
+        this.elements.recipeDisplay.style.display = 'none';
+        this.elements.recipeDisplay.classList.remove('active');
+        this.elements.landingView.style.display = 'block';
+        this.elements.urlInput.value = '';
+        this.elements.urlInput.focus();
+        
+        // Reset confidence details panel
+        this.elements.confidenceDetails.style.display = 'none';
+        this.elements.confidenceToggle.classList.remove('open');
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    showConfidenceBadge(level, score = null, details = null) {
+        const badge = this.elements.confidenceBadge;
+        const container = this.elements.confidenceContainer;
+        badge.className = 'confidence-badge';
+        
+        let badgeText = '';
+        let tooltipText = '';
+        
+        // Determine badge text with score if available
+        if (level === 'high' || level === 1) {
+            badge.classList.add('high');
+            badgeText = score ? `High Confidence (${score}/100)` : 'High confidence extraction';
+            container.style.display = 'flex';
+        } else if (level === 'medium' || level === 2) {
+            badge.classList.add('medium');
+            badgeText = score ? `Medium Confidence (${score}/100)` : 'Medium confidence extraction - please verify details';
+            container.style.display = 'flex';
+        } else if (level === 'low') {
+            badge.classList.add('low');
+            badgeText = score ? `Low Confidence (${score}/100)` : 'Low confidence extraction - please verify all details';
+            container.style.display = 'flex';
+        } else {
+            container.style.display = 'none';
+            return;
+        }
+        
+        badge.textContent = badgeText;
+        
+        // Build tooltip with detailed breakdown if details are available
+        if (details) {
+            const parts = [];
+            
+            // Title
+            if (details.title) {
+                const titleStatus = details.title.points > 0 ? '✓' : '✗';
+                parts.push(`Title: ${titleStatus}`);
+            }
+            
+            // Ingredients
+            if (details.ingredients) {
+                parts.push(`Ingredients: ${details.ingredients.count}`);
+            }
+            
+            // Instructions
+            if (details.instructions) {
+                parts.push(`Instructions: ${details.instructions.count}`);
+            }
+            
+            // Metadata
+            if (details.metadata) {
+                parts.push(`Metadata: ${details.metadata.fieldsPresent}/${details.metadata.fieldsTotal}`);
+            }
+            
+            // Phase
+            if (details.phase) {
+                parts.push(`Phase: ${details.phase.value}`);
+            }
+            
+            tooltipText = parts.join(', ');
+            badge.title = tooltipText;
+            
+            // Populate the details panel
+            this.populateConfidenceDetails(details, score);
+        } else {
+            badge.title = '';
+        }
+    },
+
+    populateConfidenceDetails(details, totalScore) {
+        const tbody = this.elements.confidenceDetailsBody;
+        tbody.innerHTML = '';
+        
+        // Phase
+        if (details.phase) {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>Extraction Phase</td>
+                <td>${details.phase.points} / ${details.phase.max}</td>
+                <td><span class="status-icon">Phase ${details.phase.value}</span></td>
+            `;
+        }
+        
+        // Title
+        if (details.title) {
+            const status = details.title.points > 0 ? '✓ Valid' : '✗ Missing/Generic';
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>Recipe Title</td>
+                <td>${details.title.points} / ${details.title.max}</td>
+                <td><span class="status-icon">${this.escapeHtml(status)}</span></td>
+            `;
+        }
+        
+        // Ingredients
+        if (details.ingredients) {
+            const qualityBonus = details.ingredients.qualityBonus || 0;
+            const bonusText = qualityBonus > 0 ? ` (+${qualityBonus} quality)` : '';
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>Ingredients</td>
+                <td>${details.ingredients.points} / ${details.ingredients.max}</td>
+                <td><span class="status-icon">${details.ingredients.count} items${bonusText}</span></td>
+            `;
+        }
+        
+        // Instructions
+        if (details.instructions) {
+            const qualityBonus = details.instructions.qualityBonus || 0;
+            const bonusText = qualityBonus > 0 ? ` (+${qualityBonus} quality)` : '';
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>Instructions</td>
+                <td>${details.instructions.points} / ${details.instructions.max}</td>
+                <td><span class="status-icon">${details.instructions.count} steps${bonusText}</span></td>
+            `;
+        }
+        
+        // Metadata
+        if (details.metadata) {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>Metadata</td>
+                <td>${details.metadata.points} / ${details.metadata.max}</td>
+                <td><span class="status-icon">${details.metadata.fieldsPresent}/${details.metadata.fieldsTotal} fields</span></td>
+            `;
+        }
+        
+        // Total
+        if (totalScore) {
+            const row = tbody.insertRow();
+            row.style.fontWeight = '600';
+            row.style.borderTop = '2px solid #e5e7eb';
+            row.innerHTML = `
+                <td>Total Score</td>
+                <td>${totalScore} / 100</td>
+                <td></td>
+            `;
+        }
+    },
+
+    toggleConfidenceDetails() {
+        const details = this.elements.confidenceDetails;
+        const toggle = this.elements.confidenceToggle;
+        
+        if (details.style.display === 'none') {
+            details.style.display = 'block';
+            toggle.classList.add('open');
+            toggle.title = 'Hide details';
+        } else {
+            details.style.display = 'none';
+            toggle.classList.remove('open');
+            toggle.title = 'Show details';
+        }
     },
 
     renderMetadata(metadata) {
         const items = [];
         
+        const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+        
         if (metadata.prepTime) {
-            items.push({ label: 'Prep Time', value: metadata.prepTime });
+            items.push({ icon: clockIcon, value: `Prep: ${metadata.prepTime}` });
         }
         if (metadata.cookTime) {
-            items.push({ label: 'Cook Time', value: metadata.cookTime });
+            items.push({ icon: clockIcon, value: `Cook: ${metadata.cookTime}` });
+        }
+        if (metadata.totalTime) {
+            items.push({ icon: clockIcon, value: `Total: ${metadata.totalTime}` });
         }
         if (metadata.servings) {
-            items.push({ label: 'Servings', value: metadata.servings });
+            const servingIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+            items.push({ icon: servingIcon, value: `Servings: ${metadata.servings}` });
         }
 
         if (items.length === 0) {
@@ -194,7 +396,7 @@ const UI = {
         this.elements.recipeMetadata.style.display = 'flex';
         this.elements.recipeMetadata.innerHTML = items.map(item => `
             <div class="metadata-item">
-                <span class="metadata-label">${this.escapeHtml(item.label)}</span>
+                ${item.icon}
                 <span class="metadata-value">${this.escapeHtml(item.value)}</span>
             </div>
         `).join('');
@@ -202,23 +404,38 @@ const UI = {
 
     renderIngredients(ingredients) {
         if (!Array.isArray(ingredients) || ingredients.length === 0) {
-            this.elements.ingredientsList.innerHTML = '<li>No ingredients found</li>';
+            this.elements.ingredientsList.innerHTML = '<li><button class="ingredient-checkbox" disabled></button><span class="ingredient-text">No ingredients found</span></li>';
             return;
         }
 
-        this.elements.ingredientsList.innerHTML = ingredients.map(ingredient => {
+        this.elements.ingredientsList.innerHTML = ingredients.map((ingredient, index) => {
             // Handle both string and object formats
             const text = typeof ingredient === 'string' 
                 ? ingredient 
                 : `${ingredient.quantity || ''} ${ingredient.unit || ''} ${ingredient.item || ''}`.trim();
             
-            return `<li>${this.escapeHtml(text)}</li>`;
+            return `
+                <li>
+                    <button class="ingredient-checkbox" data-index="${index}"></button>
+                    <span class="ingredient-text">${this.escapeHtml(text)}</span>
+                </li>
+            `;
         }).join('');
+
+        // Add checkbox click handlers
+        this.elements.ingredientsList.querySelectorAll('.ingredient-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('click', (e) => {
+                e.preventDefault();
+                checkbox.classList.toggle('checked');
+                const textSpan = checkbox.nextElementSibling;
+                textSpan.classList.toggle('checked');
+            });
+        });
     },
 
     renderInstructions(instructions) {
         if (!Array.isArray(instructions) || instructions.length === 0) {
-            this.elements.instructionsList.innerHTML = '<li>No instructions found</li>';
+            this.elements.instructionsList.innerHTML = '<li><span class="instruction-number"></span><span class="instruction-text">No instructions found</span></li>';
             return;
         }
 
@@ -227,8 +444,35 @@ const UI = {
                 ? instruction 
                 : instruction.text || '';
             
-            return `<li>${this.escapeHtml(text)}</li>`;
+            return `
+                <li>
+                    <span class="instruction-number"></span>
+                    <span class="instruction-text">${this.escapeHtml(text)}</span>
+                </li>
+            `;
         }).join('');
+    },
+
+    renderImage(imageUrl) {
+        this.elements.recipeImage.src = imageUrl;
+        this.elements.recipeImage.alt = this.elements.recipeTitle.textContent || 'Recipe';
+        this.elements.recipeImageContainer.style.display = 'block';
+    },
+
+    copyIngredientsToClipboard() {
+        const ingredients = [];
+        this.elements.ingredientsList.querySelectorAll('.ingredient-text').forEach(span => {
+            if (!span.classList.contains('checked')) {
+                ingredients.push(span.textContent);
+            }
+        });
+
+        const text = ingredients.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('Ingredients copied to clipboard!');
+        }).catch(() => {
+            this.showToast('Failed to copy ingredients', 3000);
+        });
     },
 
     escapeHtml(text) {
@@ -250,6 +494,26 @@ class CleanPlateApp {
         UI.elements.form.addEventListener('submit', async (e) => {
             e.preventDefault();
             await this.handleFormSubmit();
+        });
+
+        // Bind back button
+        UI.elements.backButton.addEventListener('click', () => {
+            UI.hideRecipe();
+        });
+
+        // Bind copy ingredients button
+        UI.elements.copyIngredientsBtn.addEventListener('click', () => {
+            UI.copyIngredientsToClipboard();
+        });
+
+        // Bind print button
+        UI.elements.printBtn.addEventListener('click', () => {
+            window.print();
+        });
+
+        // Bind confidence toggle button
+        UI.elements.confidenceToggle.addEventListener('click', () => {
+            UI.toggleConfidenceDetails();
         });
     }
 

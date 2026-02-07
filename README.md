@@ -21,6 +21,7 @@ The **solution**: CleanPlate extracts the actual recipe—ingredients and instru
 ### The Main Features
 - **Extract recipes from any URL**: Paste a link, get a clean recipe
 - **Two-phase "Waterfall" extraction**: Tries structured data first, falls back to smart DOM scraping
+- **Confidence scoring**: Every extraction gets a 0-100 reliability score with detailed breakdown
 - **Works on protected sites**: Built-in bot-detection evasion gets past most blocks
 - **Clean, readable interface**: "Warm paper" aesthetic—like a cookbook, not a dashboard
 - **Instant results**: No loading spinners that make you question reality
@@ -33,6 +34,50 @@ The **solution**: CleanPlate extracts the actual recipe—ingredients and instru
 - **SSRF protection**: Blocks internal/private IP ranges
 - **Session-based rate limiting**: 10 requests/minute, 2-second per-domain delays
 - **Zero external dependencies**: Pure PHP + vanilla JavaScript
+
+### Confidence Scoring
+
+Every extraction gets a **0-100 confidence score** that tells you how reliable the data is—independent of which extraction phase was used.
+
+**Scoring Breakdown** (100 points total):
+
+| Factor | Points | Criteria |
+|--------|--------|----------|
+| **Extraction Phase** | 40 (Phase 1)<br>20 (Phase 2) | JSON-LD structured data earns more trust than DOM scraping |
+| **Recipe Title** | 10 | Valid, non-generic title (not "Recipe", "Untitled", etc.) |
+| **Ingredients** | 20 | ≥5 items = 20 pts, ≥2 items = 10 pts, <2 = 0 pts |
+| **Instructions** | 20 | ≥5 steps = 20 pts, ≥2 steps = 10 pts, <2 = 0 pts |
+| **Metadata** | 10 | 2 pts each for prepTime, cookTime, totalTime, servings, imageUrl |
+| **Quality Bonuses** | +8 (max) | +5 for measurements in ingredients (cups, tsp, oz, etc.)<br>+3 for action verbs in instructions (mix, bake, preheat, etc.) |
+
+**Confidence Levels**:
+- **High** (≥80): Extraction is reliable, all critical fields present with quality indicators
+- **Medium** (50-79): Good extraction but missing some metadata or quality markers
+- **Low** (<50): Minimal data extracted, verify carefully before using
+
+**Key Points**:
+- Phase 1 (JSON-LD) extractions can still score low if the structured data is incomplete
+- Phase 2 (DOM) extractions with detailed content can score medium or high
+- The badge in the UI shows the numeric score and a detailed breakdown on click
+- Scores help you decide whether to trust the extraction or manually verify the original source
+
+**Debug Logging** (optional):
+
+To analyze scoring patterns across different sites, enable debug logging:
+
+```bash
+# API mode
+CONFIDENCE_DEBUG=1 php -S localhost:8080
+
+# Test harness
+php test-scraper.php --debug
+```
+
+Logs include score breakdowns by factor:
+```
+[2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 85/100 (HIGH) | 
+Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+5
+```
 
 ---
 
@@ -72,17 +117,18 @@ php -S localhost:8080
 
 ```
 cleanplate/
-├── parser.php                 # JSON API endpoint (rate limiting, SSRF protection)
-├── system-check.php           # Diagnostic tool (verify PHP extensions, permissions)
-├── test-scraper.php           # Test harness for recipe extraction
+├── parser.php                     # JSON API endpoint (rate limiting, SSRF protection)
+├── system-check.php               # Diagnostic tool (verify PHP extensions, permissions)
+├── test-scraper.php               # Test harness for recipe extraction
+├── test-confidence-scoring.php    # Comprehensive test suite for confidence algorithm
 ├── includes/
-│   └── RecipeParser.php       # Core extraction logic (2-phase waterfall)
+│   └── RecipeParser.php           # Core extraction logic (2-phase waterfall + scoring)
 └── public/
-    ├── index.html             # Main UI
+    ├── index.html                 # Main UI (landing + recipe views)
     ├── css/
-    │   └── style.css          # Warm paper aesthetic (serif headings, sans body)
+    │   └── style.css              # Warm paper aesthetic (serif headings, sans body)
     └── js/
-        └── app.js             # Client-side state management & API calls
+        └── app.js                 # Client-side state management & API calls
 ```
 
 ---
