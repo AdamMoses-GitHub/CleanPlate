@@ -28,7 +28,7 @@ $debugConfidenceScoring = getenv('CONFIDENCE_DEBUG') !== false
 set_time_limit(30);
 
 // Include the parser class
-require_once __DIR__ . '/includes/RecipeParser.php';
+require_once __DIR__ . '/../includes/RecipeParser.php';
 
 // Set JSON response headers
 header('Content-Type: application/json; charset=utf-8');

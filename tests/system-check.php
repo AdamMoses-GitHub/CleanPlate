@@ -8,17 +8,20 @@
 $requiredPHPVersion = '7.4.0';
 $requiredExtensions = ['curl', 'dom', 'json', 'mbstring', 'libxml'];
 $requiredFiles = [
-    'parser.php',
-    'includes/RecipeParser.php',
-    'public/index.html',
-    'public/js/app.js',
-    'public/css/style.css'
+    '../api/parser.php',
+    '../includes/RecipeParser.php',
+    '../includes/IngredientFilter.php',
+    '../public/index.html',
+    '../public/js/app.js',
+    '../public/css/style.css'
 ];
 $requiredDirs = [
-    'includes',
-    'public',
-    'public/js',
-    'public/css'
+    '../api',
+    '../includes',
+    '../public',
+    '../public/js',
+    '../public/css',
+    '../tests'
 ];
 
 // Start output
@@ -270,7 +273,7 @@ foreach ($requiredFiles as $file) {
 // Check 5: Class Loading
 $section = 'Core Functionality';
 
-$recipeParserPath = __DIR__ . '/includes/RecipeParser.php';
+$recipeParserPath = __DIR__ . '/../includes/RecipeParser.php';
 if (file_exists($recipeParserPath)) {
     try {
         require_once $recipeParserPath;
@@ -305,7 +308,7 @@ if (file_exists($recipeParserPath)) {
     $checks[$section][] = [
         'status' => 'fail',
         'title' => 'RecipeParser Class',
-        'detail' => "✗ includes/RecipeParser.php not found"
+        'detail' => "✗ ../includes/RecipeParser.php not found"
     ];
     $failCount++;
 }
@@ -478,7 +481,7 @@ echo "<div class='stat'><strong>Total:</strong> $totalChecks checks</div>\n";
 echo "</div>\n";
 
 if ($allPassed) {
-    echo "<a href='public/index.html' class='btn'>→ Launch CleanPlate</a>\n";
+    echo "<a href='../public/index.html' class='btn'>→ Launch CleanPlate</a>\n";
 }
 
 echo "</div>\n";

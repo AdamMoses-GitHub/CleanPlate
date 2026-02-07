@@ -36,8 +36,8 @@ For Apache/Nginx servers or shared hosting:
 
 3. **Set permissions** (Linux/macOS):
    ```bash
-   chmod 755 parser.php system-check.php test-scraper.php
-   chmod 644 includes/RecipeParser.php
+   chmod 755 api/parser.php tests/*.php
+   chmod 644 includes/*.php
    ```
 
 4. **Configure web server**:
@@ -51,7 +51,7 @@ For Apache/Nginx servers or shared hosting:
      ```
 
 5. **Test the deployment**:
-   - Navigate to `http://your-domain.com/system-check.php`
+   - Navigate to `http://your-domain.com/tests/system-check.php`
    - Verify all checks pass (green indicators)
 
 ### Method B: Quick Local Development
@@ -70,7 +70,7 @@ For rapid testing on your machine:
    ```
 
 3. **Open in browser**:
-   - System check: `http://localhost:8080/system-check.php`
+   - System check: `http://localhost:8080/tests/system-check.php`
    - Main app: `http://localhost:8080/public/index.html`
 
 **Note**: The built-in server is NOT suitable for production (single-threaded, no caching).
@@ -96,11 +96,11 @@ For rapid testing on your machine:
 
 ### API Endpoint (Programmatic Access)
 
-Send POST requests to `parser.php`:
+Send POST requests to `api/parser.php`:
 
 **Request**:
 ```bash
-curl -X POST http://localhost:8080/parser.php \
+curl -X POST http://localhost:8080/api/parser.php \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.example.com/recipe"}'
 ```
@@ -209,7 +209,7 @@ curl -X POST http://localhost:8080/parser.php \
    ```bash
    while read url; do
      echo "Testing: $url"
-     curl -s -X POST http://localhost:8080/parser.php \
+     curl -s -X POST http://localhost:8080/api/parser.php \
        -H "Content-Type: application/json" \
        -d "{\"url\": \"$url\"}" | jq '.status'
    done < test-urls.txt
@@ -287,7 +287,8 @@ cleanplate/
 **Run system diagnostics**:
 ```bash
 php -S localhost:8080
-# Open: http://localhost:8080/system-check.php
+# Open: http://localhost:8080/tests/system-check.php
+# Or visit: http://localhost:8080/tests/ for test suite index
 ```
 The system check validates:
 - PHP version (7.4+)
@@ -299,7 +300,7 @@ The system check validates:
 
 **Manual recipe test**:
 ```bash
-php test-scraper.php "https://www.allrecipes.com/recipe/12345/"
+php tests/test-scraper.php "https://www.allrecipes.com/recipe/12345/"
 ```
 This bypasses the web interface and directly invokes `RecipeParser::parse()`.
 
@@ -362,7 +363,7 @@ This bypasses the web interface and directly invokes `RecipeParser::parse()`.
 
 ### Adjust Rate Limits
 
-Edit [parser.php](parser.php) (lines 73-74):
+Edit [api/parser.php](api/parser.php) (lines 73-74):
 ```php
 $rateLimit = 20;  // requests (default: 10)
 $ratePeriod = 60; // seconds (default: 60)

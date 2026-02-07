@@ -2,17 +2,51 @@
 /**
  * Test Script for Enhanced Bot-Detection Evasion
  * Tests the improved recipe scraper against various sites
+ * 
+ * Usage:
+ *   CLI: php test-scraper.php [URL] [--debug]
+ *   Web: http://localhost:8080/tests/test-scraper.php?url=https://example.com&debug=1
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-session_start();
+// Detect execution mode
+$isCLI = php_sapi_name() === 'cli';
 
-require_once __DIR__ . '/includes/RecipeParser.php';
+// Only start session in non-CLI mode
+if (!$isCLI) {
+    session_start();
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Scraper Test Suite</title>
+    <style>
+        body { font-family: "Courier New", monospace; background: #1e1e1e; color: #d4d4d4; padding: 2rem; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        .warn { color: #dcdcaa; }
+        pre { background: #252526; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        a { color: #4fc1ff; }
+    </style>
+</head>
+<body>
+<div class="container">
+<pre>';
+} else {
+    session_start();
+}
 
-// Enable debug logging with --debug flag
-$enableDebugLogging = in_array('--debug', $argv ?? [], true);
+require_once __DIR__ . '/../includes/RecipeParser.php';
+
+// Enable debug logging (CLI: --debug flag, Web: ?debug=1)
+$enableDebugLogging = $isCLI 
+    ? in_array('--debug', $argv ?? [], true)
+    : isset($_GET['debug']);
 if ($enableDebugLogging) {
     echo "Debug logging enabled - confidence scores will be logged to error log\n\n";
 }
@@ -28,16 +62,29 @@ echo "\n" . str_repeat('═', 70) . "\n";
 echo "  CleanPlate Recipe Extraction Test Suite\n";
 echo str_repeat('═', 70) . "\n\n";
 
-// Test single URL if provided via command line
-if (isset($argv[1]) && $argv[1] !== '--debug') {
-    echo "Testing custom URL: {$argv[1]}\n\n";
-    testUrl('Custom', $argv[1], $enableDebugLogging);
+// Test single URL if provided (CLI or web)
+$customUrl = $isCLI 
+    ? (isset($argv[1]) && $argv[1] !== '--debug' ? $argv[1] : null)
+    : ($_GET['url'] ?? null);
+
+if ($customUrl) {
+    echo "Testing custom URL: {$customUrl}\n\n";
+    testUrl('Custom', $customUrl, $enableDebugLogging, $isCLI);
+    
+    // Close HTML for web mode
+    if (!$isCLI) {
+        echo '</pre>
+<p><a href="index.html">← Back to Test Suite</a></p>
+</div>
+</body>
+</html>';
+    }
     exit;
 }
 
 // Test all predefined URLs
 foreach ($testUrls as $siteName => $url) {
-    testUrl($siteName, $url, $enableDebugLogging);
+    testUrl($siteName, $url, $enableDebugLogging, $isCLI);
     
     // Add delay between tests to avoid rate limiting
     if (next($testUrls) !== false) {
@@ -52,10 +99,19 @@ echo "\n" . str_repeat('═', 70) . "\n";
 echo "  Testing Complete\n";
 echo str_repeat('═', 70) . "\n";
 
+// Close HTML for web mode
+if (!$isCLI) {
+    echo '</pre>
+<p><a href="index.html">← Back to Test Suite</a></p>
+</div>
+</body>
+</html>';
+}
+
 /**
  * Test a single URL
  */
-function testUrl($siteName, $url, $enableDebugLogging = false) {
+function testUrl($siteName, $url, $enableDebugLogging = false, $isCLI = true) {
     echo "┌" . str_repeat('─', 68) . "┐\n";
     echo "│ " . str_pad($siteName, 66) . " │\n";
     echo "└" . str_repeat('─', 68) . "┘\n";
@@ -72,11 +128,11 @@ function testUrl($siteName, $url, $enableDebugLogging = false) {
         
         $elapsed = round((microtime(true) - $startTime), 2);
         
-        // Color codes for terminal output (ANSI codes)
-        $colorReset = "\033[0m";
-        $colorGreen = "\033[32m";
-        $colorCyan = "\033[36m";
-        $colorBold = "\033[1m";
+        // Color codes for terminal output (ANSI codes) - only in CLI mode
+        $colorReset = $isCLI ? "\033[0m" : '';
+        $colorGreen = $isCLI ? "\033[32m" : '';
+        $colorCyan = $isCLI ? "\033[36m" : '';
+        $colorBold = $isCLI ? "\033[1m" : '';
         
         echo "  {$colorGreen}✓ SUCCESS{$colorReset} │ Phase {$result['phase']} │ {$colorCyan}{$elapsed}s{$colorReset}\n";
         
@@ -85,11 +141,11 @@ function testUrl($siteName, $url, $enableDebugLogging = false) {
             $score = $result['confidence'];
             $level = $result['confidenceLevel'];
             
-            // Color codes for terminal output (ANSI codes)
-            $colorReset = "\033[0m";
-            $colorGreen = "\033[32m";
-            $colorAmber = "\033[33m";
-            $colorRed = "\033[31m";
+            // Color codes for terminal output (ANSI codes) - only in CLI mode
+            $colorReset = $isCLI ? "\033[0m" : '';
+            $colorGreen = $isCLI ? "\033[32m" : '';
+            $colorAmber = $isCLI ? "\033[33m" : '';
+            $colorRed = $isCLI ? "\033[31m" : '';
             
             $color = $colorReset;
             $emoji = '●';
@@ -149,10 +205,10 @@ function testUrl($siteName, $url, $enableDebugLogging = false) {
         }
         
     } catch (Exception $e) {
-        // Color codes for errors
-        $colorReset = "\033[0m";
-        $colorRed = "\033[31m";
-        $colorBold = "\033[1m";
+        // Color codes for errors - only in CLI mode
+        $colorReset = $isCLI ? "\033[0m" : '';
+        $colorRed = $isCLI ? "\033[31m" : '';
+        $colorBold = $isCLI ? "\033[1m" : '';
         
         echo "  {$colorRed}{$colorBold}✗ FAILED{$colorReset}\n";
         echo "  Error: {$e->getMessage()}\n";

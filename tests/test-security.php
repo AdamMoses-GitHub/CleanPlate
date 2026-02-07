@@ -3,7 +3,37 @@
 /**
  * Security Validation Test Suite
  * Tests security fixes applied to CleanPlate
+ * 
+ * Usage:
+ *   CLI: php test-security.php
+ *   Web: http://localhost:8080/tests/test-security.php
  */
+
+// Detect execution mode
+$isCLI = php_sapi_name() === 'cli';
+
+// Set headers for web mode
+if (!$isCLI) {
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Validation Test Suite</title>
+    <style>
+        body { font-family: "Courier New", monospace; background: #1e1e1e; color: #d4d4d4; padding: 2rem; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        pre { background: #252526; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        a { color: #4fc1ff; }
+    </style>
+</head>
+<body>
+<div class="container">
+<pre>';
+}
 
 echo "═══════════════════════════════════════════════════════════════\n";
 echo "  CleanPlate Security Validation\n";
@@ -135,6 +165,15 @@ $total = $passed + $failed;
 $percentage = $total > 0 ? round(($passed / $total) * 100, 1) : 0;
 echo "  Success Rate: $percentage%\n";
 echo "═══════════════════════════════════════════════════════════════\n";
+
+// Close HTML for web mode
+if (!$isCLI) {
+    echo '</pre>
+<p><a href="index.html">← Back to Test Suite</a></p>
+</div>
+</body>
+</html>';
+}
 
 exit($failed > 0 ? 1 : 0);
 

@@ -2,12 +2,43 @@
 /**
  * Comprehensive Test Suite for Confidence Scoring System
  * Tests the confidence calculation algorithm with various test cases
+ * 
+ * Usage:
+ *   CLI: php test-confidence-scoring.php
+ *   Web: http://localhost:8080/tests/test-confidence-scoring.php
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/includes/RecipeParser.php';
+require_once __DIR__ . '/../includes/RecipeParser.php';
+
+// Detect execution mode
+$isCLI = php_sapi_name() === 'cli';
+
+// Set headers for web mode
+if (!$isCLI) {
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confidence Scoring Test Suite</title>
+    <style>
+        body { font-family: "Courier New", monospace; background: #1e1e1e; color: #d4d4d4; padding: 2rem; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        .header { color: #4fc1ff; font-weight: bold; border-bottom: 2px solid #4fc1ff; padding-bottom: 0.5rem; margin: 1.5rem 0 1rem 0; }
+        pre { background: #252526; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        a { color: #4fc1ff; }
+    </style>
+</head>
+<body>
+<div class="container">
+<pre>';
+}
 
 echo "═══════════════════════════════════════════════════════════════\n";
 echo "  CleanPlate Confidence Scoring Test Suite\n";
@@ -513,6 +544,15 @@ echo "  Failed:       {$failedTests} ✗\n";
 $successRate = $totalTests > 0 ? round(($passedTests / $totalTests) * 100, 1) : 0;
 echo "  Success Rate: {$successRate}%\n";
 echo "═══════════════════════════════════════════════════════════════\n";
+
+// Close HTML for web mode
+if (!$isCLI) {
+    echo '</pre>
+<p><a href="index.html">← Back to Test Suite</a></p>
+</div>
+</body>
+</html>';
+}
 
 // Exit with appropriate code
 exit($failedTests > 0 ? 1 : 0);

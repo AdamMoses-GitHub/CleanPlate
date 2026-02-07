@@ -48,7 +48,7 @@ Every extraction gets a **0-100 confidence score** that tells you how reliable t
 | **Ingredients** | 20 | ≥5 items = 20 pts, ≥2 items = 10 pts, <2 = 0 pts |
 | **Instructions** | 20 | ≥5 steps = 20 pts, ≥2 steps = 10 pts, <2 = 0 pts |
 | **Metadata** | 10 | 2 pts each for prepTime, cookTime, totalTime, servings, imageUrl |
-| **Quality Bonuses** | +8 (max) | +5 for measurements in ingredients (cups, tsp, oz, etc.)<br>+3 for action verbs in instructions (mix, bake, preheat, etc.) |
+| **Quality Bonuses** | +10 (max) | +5 for measurements in ingredients (cups, tsp, oz, etc.)<br>+3 for action verbs in instructions (mix, bake, preheat, etc.)<br>+2 for clean data (≥95% pass post-processing filter) |
 
 **Confidence Levels**:
 - **High** (≥80): Extraction is reliable, all critical fields present with quality indicators
@@ -70,7 +70,7 @@ To analyze scoring patterns across different sites, enable debug logging:
 CONFIDENCE_DEBUG=1 php -S localhost:8080
 
 # Test harness
-php test-scraper.php --debug
+php tests/test-scraper.php --debug
 ```
 
 Logs include score breakdowns by factor:
@@ -78,6 +78,62 @@ Logs include score breakdowns by factor:
 [2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 85/100 (HIGH) | 
 Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+5
 ```
+
+---
+
+### Intelligent Post-Processing
+
+After extraction, CleanPlate automatically **filters out junk** that web scrapers commonly pick up:
+
+**What Gets Removed**:
+- **Navigation items**: "Home", "Recipes", "Search", "Share on Facebook", "Print Recipe"
+- **Section headers**: "Ingredients:", "Directions:", "Notes:", "You'll need:"
+- **UI elements**: "Back to recipes", "Sign up", "Subscribe", "View all"
+- **Noise**: Empty strings, single characters, all-caps headers (INGREDIENTS, DIRECTIONS)
+- **Duplicates**: Multiple copies of the same item
+
+**How It Works**:
+The `IngredientFilter` class uses pattern matching to validate each ingredient and instruction:
+
+```php
+// Positive signals (keeps):
+- Measurements: "2 cups", "1 tablespoon", "1/2 tsp"
+- Food words: "chicken", "butter", "garlic", "flour"
+- Quantities: numbers, fractions, ranges ("2-3 cups")
+- Cooking verbs: "mix", "bake", "chop", "season" (instructions)
+
+// Negative signals (removes):
+- Navigation patterns: /^(home|recipes|search|menu)/i
+- Section headers: /^(ingredients|directions|notes):/i
+- All-caps single words: INGREDIENTS, DIRECTIONS
+- Too short: <3 characters
+```
+
+**Data Quality Bonus**:
+If ≥95% of scraped data passes validation (minimal junk removed), the confidence score gets a **+2 point bonus**. This rewards clean extractions from well-structured sites.
+
+**Strictness Levels**:
+The filter operates in `BALANCED` mode by default, but can be configured:
+- `LENIENT` - Allows almost everything (threshold = 0)
+- `BALANCED` - Balanced filtering (threshold = 2) ← **default**
+- `STRICT` - Aggressive filtering (threshold = 5)
+
+**Testing**:
+```bash
+# Run filter test suite (CLI)
+php tests/test-ingredient-filter.php
+
+# Enable debug logging to see what gets filtered
+php tests/test-ingredient-filter.php --debug
+
+# Or run in browser:
+# http://localhost:8080/tests/test-ingredient-filter.php
+# http://localhost:8080/tests/test-ingredient-filter.php?debug=1
+```
+
+All tests support both **CLI** and **web browser** execution modes. Visit `http://localhost:8080/tests/` for a complete test suite interface with "Run in Browser" buttons.
+
+The filter runs automatically on every extraction—no configuration needed.
 
 ---
 
@@ -117,18 +173,27 @@ php -S localhost:8080
 
 ```
 cleanplate/
-├── parser.php                     # JSON API endpoint (rate limiting, SSRF protection)
-├── system-check.php               # Diagnostic tool (verify PHP extensions, permissions)
-├── test-scraper.php               # Test harness for recipe extraction
-├── test-confidence-scoring.php    # Comprehensive test suite for confidence algorithm
+├── api/
+│   └── parser.php                 # JSON API endpoint (rate limiting, SSRF protection)
 ├── includes/
-│   └── RecipeParser.php           # Core extraction logic (2-phase waterfall + scoring)
-└── public/
-    ├── index.html                 # Main UI (landing + recipe views)
-    ├── css/
-    │   └── style.css              # Warm paper aesthetic (serif headings, sans body)
-    └── js/
-        └── app.js                 # Client-side state management & API calls
+│   ├── RecipeParser.php           # Core extraction logic (2-phase waterfall + scoring)
+│   └── IngredientFilter.php       # Post-processing filter (removes navigation/junk)
+├── public/
+│   ├── index.html                 # Main UI (landing + recipe views)
+│   ├── css/
+│   │   └── style.css              # Warm paper aesthetic (serif headings, sans body)
+│   └── js/
+│       └── app.js                 # Client-side state management & API calls
+├── tests/
+│   ├── index.html                 # Test suite browser interface
+│   ├── system-check.php           # Diagnostic tool (verify PHP extensions, permissions)
+│   ├── test-scraper.php           # Test harness for recipe extraction
+│   ├── test-confidence-scoring.php # Comprehensive test suite for confidence algorithm
+│   └── test-ingredient-filter.php # Test suite for post-processing filter
+├── README.md                      # This file
+├── INSTALL_AND_USAGE.md           # Detailed setup guide
+├── LICENSE                        # MIT License
+└── SECURITY.md                    # Security policy
 ```
 
 ---
@@ -149,10 +214,10 @@ CleanPlate implements multiple security layers:
 - [SECURITY-FIXES.md](SECURITY-FIXES.md) - Applied fixes and configuration guide
 
 **Production Checklist:**
-1. Update CORS origins in `parser.php` (change `['*']` to your domain)
+1. Update CORS origins in `api/parser.php` (change `['*']` to your domain)
 2. Set `APP_ENV=production` environment variable
 3. Configure `php.ini` security settings
-4. Run security validation: `php test-security.php`
+4. Run security validation: `php tests/test-security.php`
 
 For security issues, please see [SECURITY.md](SECURITY.md) if you'd like to report vulnerabilities responsibly.
 

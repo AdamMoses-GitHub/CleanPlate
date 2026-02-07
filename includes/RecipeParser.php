@@ -4,6 +4,8 @@
  * Two-phase recipe extraction: JSON-LD (Phase 1) and DOM fallback (Phase 2)
  */
 
+require_once __DIR__ . '/IngredientFilter.php';
+
 class RecipeParser {
     // Configuration constants
     const MIN_REQUEST_DELAY = 2;  // seconds between requests to same domain
@@ -22,12 +24,18 @@ class RecipeParser {
     private $timeout = self::REQUEST_TIMEOUT;
     private $cookieFile = null;
     private $debugLogging = false;  // Enable to log confidence scores for analysis
+    private $ingredientFilter = null;
     
     /**
      * Constructor - optionally enable debug logging
      */
     public function __construct($debugLogging = false) {
         $this->debugLogging = $debugLogging;
+        // Initialize ingredient filter with balanced strictness
+        $this->ingredientFilter = new IngredientFilter(
+            IngredientFilter::STRICTNESS_BALANCED,
+            $debugLogging
+        );
     }
     
     /**
@@ -276,6 +284,25 @@ class RecipeParser {
             $normalized['metadata']['imageUrl'] = $this->extractImageUrl($recipe['image']);
         }
         
+        // Apply post-processing filter to remove navigation/header junk
+        if ($this->ingredientFilter) {
+            $originalIngredientCount = count($normalized['ingredients']);
+            $originalInstructionCount = count($normalized['instructions']);
+            
+            $normalized['ingredients'] = $this->ingredientFilter->filterIngredients($normalized['ingredients']);
+            $normalized['instructions'] = $this->ingredientFilter->filterInstructions($normalized['instructions']);
+            
+            // Calculate and store quality ratio for confidence bonus
+            if ($originalIngredientCount > 0) {
+                $ingredientQualityRatio = count($normalized['ingredients']) / $originalIngredientCount;
+                $normalized['metadata']['ingredientQualityRatio'] = $ingredientQualityRatio;
+            }
+            if ($originalInstructionCount > 0) {
+                $instructionQualityRatio = count($normalized['instructions']) / $originalInstructionCount;
+                $normalized['metadata']['instructionQualityRatio'] = $instructionQualityRatio;
+            }
+        }
+        
         return $normalized;
     }
     
@@ -340,6 +367,28 @@ class RecipeParser {
             return null;
         }
         
+        // Apply post-processing filter to remove navigation/header junk
+        if ($this->ingredientFilter) {
+            $originalIngredientCount = count($ingredients);
+            $originalInstructionCount = count($instructions);
+            
+            $ingredients = $this->ingredientFilter->filterIngredients($ingredients);
+            $instructions = $this->ingredientFilter->filterInstructions($instructions);
+            
+            // Calculate and store quality ratio for confidence bonus
+            $metadata = [];
+            if ($originalIngredientCount > 0) {
+                $ingredientQualityRatio = count($ingredients) / $originalIngredientCount;
+                $metadata['ingredientQualityRatio'] = $ingredientQualityRatio;
+            }
+            if ($originalInstructionCount > 0) {
+                $instructionQualityRatio = count($instructions) / $originalInstructionCount;
+                $metadata['instructionQualityRatio'] = $instructionQualityRatio;
+            }
+        } else {
+            $metadata = [];
+        }
+        
         return [
             'title' => $title ?: 'Untitled Recipe',
             'source' => [
@@ -348,7 +397,7 @@ class RecipeParser {
             ],
             'ingredients' => $ingredients,
             'instructions' => $instructions,
-            'metadata' => []
+            'metadata' => $metadata
         ];
     }
     
@@ -499,10 +548,33 @@ class RecipeParser {
             ];
         }
         
+        // Data quality bonus (post-processing filter effectiveness)
+        // Award bonus if ≥95% of scraped data was valid (low junk removal)
+        $dataQualityBonus = 0;
+        $ingredientRatio = $data['metadata']['ingredientQualityRatio'] ?? null;
+        $instructionRatio = $data['metadata']['instructionQualityRatio'] ?? null;
+        
+        if ($ingredientRatio !== null && $ingredientRatio >= 0.95) {
+            $dataQualityBonus += 1;
+        }
+        if ($instructionRatio !== null && $instructionRatio >= 0.95) {
+            $dataQualityBonus += 1;
+        }
+        
+        if ($dataQualityBonus > 0) {
+            $qualityAdjustments += $dataQualityBonus;
+            $factors['dataQuality'] = [
+                'ingredientRatio' => $ingredientRatio,
+                'instructionRatio' => $instructionRatio,
+                'points' => $dataQualityBonus,
+                'max' => 2
+            ];
+        }
+        
         $score += $qualityAdjustments;
         $factors['qualityAdjustments'] = [
             'total' => $qualityAdjustments,
-            'max' => 8
+            'max' => 10
         ];
         
         // Cap score at max
