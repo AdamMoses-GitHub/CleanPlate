@@ -302,6 +302,7 @@ const UI = {
         confidenceDetails: document.getElementById('confidence-details'),
         confidenceDetailsBody: document.getElementById('confidence-details-body'),
         recipeTitle: document.getElementById('recipe-title'),
+        titleEditBtn: document.getElementById('title-edit-btn'),
         recipeMetadata: document.getElementById('recipe-metadata'),
         ingredientsList: document.getElementById('ingredients-list'),
         instructionsList: document.getElementById('instructions-list'),
@@ -365,6 +366,10 @@ const UI = {
     showRecipe(recipeData) {
         const { data, phase, confidence, confidenceLevel, confidenceDetails } = recipeData;
 
+        // Store original data for reference
+        this.originalRecipeTitle = data.title;
+        this.currentRecipeUrl = data.source ? data.source.url : null;
+
         // Hide landing view, show recipe view
         this.elements.landingView.style.display = 'none';
         this.elements.recipeDisplay.style.display = 'block';
@@ -382,7 +387,8 @@ const UI = {
         }
 
         // Set title
-        this.elements.recipeTitle.textContent = data.title || 'Untitled Recipe';
+        const savedTitle = this.getSavedTitle(this.currentRecipeUrl);
+        this.elements.recipeTitle.textContent = savedTitle || data.title || 'Untitled Recipe';
 
         // Set metadata if available
         if (data.metadata) {
@@ -454,6 +460,12 @@ const UI = {
         // Reset confidence details panel
         this.elements.confidenceDetails.style.display = 'none';
         this.elements.confidenceToggle.classList.remove('open');
+        
+        // Reset title editing state
+        this.elements.recipeTitle.contentEditable = 'false';
+        this.elements.recipeTitle.classList.remove('editing');
+        this.originalRecipeTitle = null;
+        this.currentRecipeUrl = null;
         
         // Reset image display state
         this.elements.imageCarousel.style.display = 'none';
@@ -731,6 +743,115 @@ const UI = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    startTitleEdit() {
+        const titleEl = this.elements.recipeTitle;
+        
+        // Make title editable
+        titleEl.contentEditable = 'true';
+        titleEl.classList.add('editing');
+        titleEl.focus();
+        
+        // Select all text
+        const range = document.createRange();
+        range.selectNodeContents(titleEl);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        // Save on Enter or blur
+        const saveTitle = () => {
+            this.endTitleEdit();
+        };
+        
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveTitle();
+            } else if (e.key === 'Escape') {
+                // Restore original title
+                titleEl.textContent = this.getSavedTitle(this.currentRecipeUrl) || this.originalRecipeTitle;
+                this.endTitleEdit();
+            }
+        };
+        
+        titleEl.addEventListener('blur', saveTitle, { once: true });
+        titleEl.addEventListener('keydown', handleKeyDown);
+        
+        // Store handler reference for cleanup
+        titleEl._keydownHandler = handleKeyDown;
+    },
+
+    endTitleEdit() {
+        const titleEl = this.elements.recipeTitle;
+        
+        // Save the new title
+        const newTitle = titleEl.textContent.trim();
+        if (newTitle && newTitle !== this.originalRecipeTitle) {
+            this.saveTitlePreference(this.currentRecipeUrl, newTitle);
+            this.showToast('Title updated!', 2000);
+        }
+        
+        // Clean up
+        titleEl.contentEditable = 'false';
+        titleEl.classList.remove('editing');
+        
+        if (titleEl._keydownHandler) {
+            titleEl.removeEventListener('keydown', titleEl._keydownHandler);
+            delete titleEl._keydownHandler;
+        }
+    },
+
+    saveTitlePreference(recipeUrl, title) {
+        if (!recipeUrl) return;
+        
+        try {
+            const key = `cleanplate_title_${this.getUrlHash(recipeUrl)}`;
+            const preference = {
+                title: title,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(key, JSON.stringify(preference));
+        } catch (e) {
+            console.warn('Failed to save title preference:', e);
+        }
+    },
+
+    getSavedTitle(recipeUrl) {
+        if (!recipeUrl) return null;
+        
+        try {
+            const key = `cleanplate_title_${this.getUrlHash(recipeUrl)}`;
+            const saved = localStorage.getItem(key);
+            
+            if (saved) {
+                const preference = JSON.parse(saved);
+                
+                // Check if preference is less than 30 days old
+                const age = Date.now() - preference.timestamp;
+                const maxAge = 30 * 24 * 60 * 60 * 1000;
+                
+                if (age < maxAge) {
+                    return preference.title;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load title preference:', e);
+        }
+        
+        return null;
+    },
+
+    getUrlHash(url) {
+        // Simple hash function for URL
+        let hash = 0;
+        for (let i = 0; i < url.length; i++) {
+            const char = url.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return Math.abs(hash).toString(36);
     }
 };
 
@@ -780,6 +901,11 @@ class CleanPlateApp {
         // Bind confidence toggle button
         UI.elements.confidenceToggle.addEventListener('click', () => {
             UI.toggleConfidenceDetails();
+        });
+
+        // Bind title edit button
+        UI.elements.titleEditBtn.addEventListener('click', () => {
+            UI.startTitleEdit();
         });
     }
 
