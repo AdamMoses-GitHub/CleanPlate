@@ -211,7 +211,16 @@ class RecipeParser {
             }
             
             // Handle both single objects and arrays
-            $items = isset($data['@graph']) ? $data['@graph'] : [$data];
+            // If @graph exists, use it; if root is array, use it directly; otherwise wrap single object
+            if (isset($data['@graph'])) {
+                $items = $data['@graph'];
+            } elseif (isset($data[0]) && is_array($data[0])) {
+                // Root is already an array of items
+                $items = $data;
+            } else {
+                // Single object
+                $items = [$data];
+            }
             
             foreach ($items as $item) {
                 if ($this->isRecipeObject($item)) {
@@ -245,7 +254,7 @@ class RecipeParser {
      */
     private function normalizeRecipeData($recipe, $url) {
         $normalized = [
-            'title' => $recipe['name'] ?? 'Untitled Recipe',
+            'title' => $this->cleanText($recipe['name'] ?? 'Untitled Recipe'),
             'source' => [
                 'url' => $url,
                 'siteName' => $this->extractDomain($url)
@@ -257,7 +266,7 @@ class RecipeParser {
         
         // Extract ingredients
         if (isset($recipe['recipeIngredient']) && is_array($recipe['recipeIngredient'])) {
-            $normalized['ingredients'] = $recipe['recipeIngredient'];
+            $normalized['ingredients'] = array_map([$this, 'cleanText'], $recipe['recipeIngredient']);
         }
         
         // Extract instructions
@@ -313,7 +322,7 @@ class RecipeParser {
         $result = [];
         
         if (is_string($instructions)) {
-            return [$instructions];
+            return [$this->cleanText($instructions)];
         }
         
         if (!is_array($instructions)) {
@@ -322,16 +331,16 @@ class RecipeParser {
         
         foreach ($instructions as $instruction) {
             if (is_string($instruction)) {
-                $result[] = $instruction;
+                $result[] = $this->cleanText($instruction);
             } elseif (is_array($instruction)) {
                 if (isset($instruction['text'])) {
-                    $result[] = $instruction['text'];
+                    $result[] = $this->cleanText($instruction['text']);
                 } elseif (isset($instruction['itemListElement'])) {
                     foreach ($instruction['itemListElement'] as $step) {
                         if (is_string($step)) {
-                            $result[] = $step;
+                            $result[] = $this->cleanText($step);
                         } elseif (isset($step['text'])) {
-                            $result[] = $step['text'];
+                            $result[] = $this->cleanText($step['text']);
                         }
                     }
                 }
@@ -772,7 +781,7 @@ class RecipeParser {
         foreach ($queries as $query) {
             $nodes = $xpath->query($query);
             if ($nodes->length > 0) {
-                return trim($nodes->item(0)->textContent);
+                return $this->cleanText($nodes->item(0)->textContent);
             }
         }
         
@@ -793,7 +802,7 @@ class RecipeParser {
             $items = $xpath->query(".//li | .//span[@class] | .//p", $container);
             
             foreach ($items as $item) {
-                $text = trim($item->textContent);
+                $text = $this->cleanText($item->textContent);
                 if (!empty($text) && strlen($text) > 2 && strlen($text) < 500) {
                     $ingredients[] = $text;
                 }
@@ -822,7 +831,7 @@ class RecipeParser {
             $items = $xpath->query(".//li | .//p", $container);
             
             foreach ($items as $item) {
-                $text = trim($item->textContent);
+                $text = $this->cleanText($item->textContent);
                 if (!empty($text) && strlen($text) > 5 && strlen($text) < 1000) {
                     $instructions[] = $text;
                 }
@@ -947,5 +956,25 @@ class RecipeParser {
         
         // Update last request time for this domain
         $_SESSION['domain_requests'][$domain] = time();
+    }
+    
+    /**
+     * Clean text by decoding HTML entities and trimming whitespace
+     * 
+     * @param string $text Text to clean
+     * @return string Cleaned text
+     */
+    private function cleanText($text) {
+        if (!is_string($text)) {
+            return $text;
+        }
+        
+        // Decode HTML entities (e.g., &#34; to ", &amp; to &)
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Trim whitespace
+        $text = trim($text);
+        
+        return $text;
     }
 }

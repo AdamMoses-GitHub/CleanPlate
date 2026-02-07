@@ -39,11 +39,11 @@
                     <div class="popular-sites">
                         <p class="popular-label">Try with popular recipe sites:</p>
                         <div class="site-buttons">
-                            <span class="site-badge">AllRecipes</span>
-                            <span class="site-badge">Food Network</span>
-                            <span class="site-badge">Bon Appétit</span>
-                            <span class="site-badge">NYT Cooking</span>
-                            <span class="site-badge">Serious Eats</span>
+                            <a href="https://www.allrecipes.com/" target="_blank" rel="noopener noreferrer" class="site-badge">AllRecipes</a>
+                            <a href="https://www.foodnetwork.com/" target="_blank" rel="noopener noreferrer" class="site-badge">Food Network</a>
+                            <a href="https://www.bonappetit.com/" target="_blank" rel="noopener noreferrer" class="site-badge">Bon Appétit</a>
+                            <a href="https://cooking.nytimes.com/" target="_blank" rel="noopener noreferrer" class="site-badge">NYT Cooking</a>
+                            <a href="https://www.seriouseats.com/" target="_blank" rel="noopener noreferrer" class="site-badge">Serious Eats</a>
                         </div>
                     </div>
                 </div>
@@ -60,29 +60,6 @@
                 </button>
 
                 <div class="recipe-card">
-                    <div class="confidence-container" style="display: none;" id="confidence-container">
-                        <div id="confidence-badge" class="confidence-badge"></div>
-                        <button id="confidence-toggle" class="confidence-toggle no-print" title="Show details">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
-                    </div>
-                    
-                    <div id="confidence-details" class="confidence-details no-print" style="display: none;">
-                        <table class="confidence-table">
-                            <thead>
-                                <tr>
-                                    <th>Factor</th>
-                                    <th>Score</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="confidence-details-body">
-                            </tbody>
-                        </table>
-                    </div>
-
                     <div class="recipe-header">
                         <h2 id="recipe-title"></h2>
                         <div class="recipe-metadata" id="recipe-metadata"></div>
@@ -121,6 +98,29 @@
                     <div id="recipe-image-container" class="recipe-image-container" style="display: none;">
                         <img id="recipe-image" class="recipe-image" alt="Recipe" />
                     </div>
+                </div>
+
+                <div class="confidence-container" style="display: none;" id="confidence-container">
+                    <div id="confidence-badge" class="confidence-badge"></div>
+                    <button id="confidence-toggle" class="confidence-toggle no-print" title="Show details">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div id="confidence-details" class="confidence-details no-print" style="display: none;">
+                    <table class="confidence-table">
+                        <thead>
+                            <tr>
+                                <th>Factor</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="confidence-details-body">
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </main>

@@ -44,7 +44,7 @@ class RecipeError extends Error {
 
 // API Client
 class CleanPlateAPI {
-    constructor(endpoint = '../parser.php') {
+    constructor(endpoint = '../api/parser.php') {
         this.endpoint = endpoint;
     }
 

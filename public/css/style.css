@@ -235,6 +235,17 @@ header {
     border: 1px solid var(--color-border-light);
     border-radius: 9999px;
     white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.site-badge:hover {
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    border-color: var(--color-border);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Error Container */
@@ -305,7 +316,9 @@ header {
 .confidence-container {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    margin-top: 2rem;
     margin-bottom: 1rem;
 }
 
@@ -356,7 +369,8 @@ header {
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     padding: 1rem;
-    margin-bottom: 1.5rem;
+    margin: 1rem auto 1.5rem auto;
+    max-width: 600px;
 }
 
 .confidence-table {
@@ -397,6 +411,7 @@ header {
 /* Action Buttons */
 .action-buttons {
     display: flex;
+    justify-content: center;
     gap: 1rem;
     margin: 1.5rem 0;
     flex-wrap: wrap;
