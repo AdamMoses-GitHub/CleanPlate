@@ -133,6 +133,31 @@ cleanplate/
 
 ---
 
+## Security
+
+CleanPlate implements multiple security layers:
+
+- ✅ **SSL Certificate Verification** - Enabled by default
+- ✅ **SSRF Protection** - Blocks internal/private IPs and localhost
+- ✅ **Input Validation** - URL scheme and length validation
+- ✅ **Security Headers** - X-Frame-Options, X-XSS-Protection, etc.
+- ✅ **Rate Limiting** - Session-based (10 requests/minute)
+- ✅ **XSS Prevention** - All outputs HTML-escaped
+
+**Security Documentation:**
+- [SECURITY-AUDIT.md](SECURITY-AUDIT.md) - Comprehensive security audit report
+- [SECURITY-FIXES.md](SECURITY-FIXES.md) - Applied fixes and configuration guide
+
+**Production Checklist:**
+1. Update CORS origins in `parser.php` (change `['*']` to your domain)
+2. Set `APP_ENV=production` environment variable
+3. Configure `php.ini` security settings
+4. Run security validation: `php test-security.php`
+
+For security issues, please see [SECURITY.md](SECURITY.md) if you'd like to report vulnerabilities responsibly.
+
+---
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.

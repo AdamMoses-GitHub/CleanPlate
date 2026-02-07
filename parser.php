@@ -32,9 +32,22 @@ require_once __DIR__ . '/includes/RecipeParser.php';
 
 // Set JSON response headers
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *'); // Adjust for production
+
+// SECURITY: Restrict CORS in production
+// TODO: Replace * with your actual domain(s)
+$allowedOrigins = ['*']; // Change to ['https://yourdomain.com'] in production
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array('*', $allowedOrigins) || in_array($origin, $allowedOrigins)) {
+    header('Access-Control-Allow-Origin: ' . (in_array('*', $allowedOrigins) ? '*' : $origin));
+}
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+
+// SECURITY: Add security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -61,6 +74,11 @@ if (empty($url)) {
     respondWithError(400, 'MISSING_URL', 'Please provide a recipe URL.');
 }
 
+// SECURITY: Validate URL length to prevent buffer attacks
+if (strlen($url) > 2048) {
+    respondWithError(400, 'INVALID_URL', 'URL is too long (maximum 2048 characters).');
+}
+
 if (!filter_var($url, FILTER_VALIDATE_URL)) {
     respondWithError(
         400, 
@@ -75,11 +93,39 @@ if (!isset($parsedUrl['scheme']) || !in_array($parsedUrl['scheme'], ['http', 'ht
     respondWithError(400, 'INVALID_URL', 'URL must use http:// or https://');
 }
 
-// Basic SSRF protection - block internal IPs
+// SECURITY: Enhanced SSRF protection - block internal/private IPs
 if (isset($parsedUrl['host'])) {
-    $ip = gethostbyname($parsedUrl['host']);
-    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+    // Block localhost variations
+    if (in_array(strtolower($parsedUrl['host']), ['localhost', '127.0.0.1', '::1', '0.0.0.0'])) {
         respondWithError(403, 'FORBIDDEN', 'Cannot access internal or private network addresses.');
+    }
+    
+    // Resolve and check IP addresses
+    $ips = @gethostbynamel($parsedUrl['host']) ?: [];
+    
+    if (empty($ips)) {
+        // Try single result
+        $ip = @gethostbyname($parsedUrl['host']);
+        if ($ip && $ip !== $parsedUrl['host']) {
+            $ips = [$ip];
+        }
+    }
+    
+    foreach ($ips as $ip) {
+        // Check for private/reserved ranges (IPv4 and IPv6)
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            respondWithError(403, 'FORBIDDEN', 'Cannot access internal or private network addresses.');
+        }
+        
+        // Additional edge case checks
+        if (preg_match('/^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/i', $ip)) {
+            respondWithError(403, 'FORBIDDEN', 'Cannot access internal or private network addresses.');
+        }
+        
+        // Check IPv6 loopback and link-local
+        if (preg_match('/^(::1|fe80:|fc00:|fd00:)/i', $ip)) {
+            respondWithError(403, 'FORBIDDEN', 'Cannot access internal or private network addresses.');
+        }
     }
 }
 
@@ -120,9 +166,15 @@ try {
     respondWithSuccess($result);
     
 } catch (Exception $e) {
-    // Log the full error for debugging
-    error_log('Recipe parsing error: ' . $e->getMessage());
-    error_log('Stack trace: ' . $e->getTraceAsString());
+    // SECURITY: Log errors safely without exposing sensitive details
+    $logMessage = 'Recipe parsing error for domain: ' . (parse_url($url, PHP_URL_HOST) ?: 'unknown');
+    error_log($logMessage);
+    
+    // Only log stack traces in development
+    if (getenv('APP_ENV') !== 'production') {
+        error_log('Error details: ' . $e->getMessage());
+        error_log('Stack trace: ' . $e->getTraceAsString());
+    }
     
     // Return user-friendly error
     $errorCode = method_exists($e, 'getCode') && $e->getCode() ? $e->getCode() : 500;

@@ -96,8 +96,18 @@ class RecipeParser {
         $userAgent = $this->getRandomUserAgent();
         
         // Setup cookie file for session persistence
+        // SECURITY: Use random filename to prevent prediction
         if ($this->cookieFile === null) {
-            $this->cookieFile = sys_get_temp_dir() . '/cleanplate_cookie_' . session_id() . '.txt';
+            $randomSuffix = bin2hex(random_bytes(8));
+            $this->cookieFile = sys_get_temp_dir() . '/cleanplate_cookie_' . $randomSuffix . '.txt';
+            
+            // Clean up cookie file on shutdown
+            $cookieFile = $this->cookieFile;
+            register_shutdown_function(function() use ($cookieFile) {
+                if (file_exists($cookieFile)) {
+                    @unlink($cookieFile);
+                }
+            });
         }
         
         curl_setopt_array($ch, [
@@ -107,7 +117,9 @@ class RecipeParser {
             CURLOPT_MAXREDIRS => self::MAX_REDIRECTS,
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_USERAGENT => $userAgent,
-            CURLOPT_SSL_VERIFYPEER => false,  // Many recipe sites have cert issues
+            // SECURITY: Enable SSL verification (critical for security)
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_ENCODING => '',  // Accept gzip, deflate, br
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_2_0,  // HTTP/2 for modern browsers
             
@@ -135,10 +147,16 @@ class RecipeParser {
         $html = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $errno = curl_errno($ch);
         
         curl_close($ch);
         
         if ($html === false) {
+            // SECURITY: Provide helpful but secure error messages for SSL issues
+            if (in_array($errno, [60, 51, 58, 77])) {
+                // SSL certificate errors (CURLE_SSL_CACERT, CURLE_PEER_FAILED_VERIFICATION, etc.)
+                throw new Exception('SSL certificate verification failed. The website may have an invalid or expired certificate.');
+            }
             throw new Exception('Could not fetch URL: ' . $error);
         }
         
