@@ -387,7 +387,7 @@ const UI = {
         // Update dropdown label
         const viewLabels = {
             'clean': 'Clean',
-            'text-only': 'Just Text',
+            'text-only': 'Simple Text',
             'print': 'Printable'
         };
         if (this.elements.viewSelectorLabel) {
@@ -403,7 +403,7 @@ const UI = {
         // Show toast notification
         const viewNames = {
             'clean': 'Clean View',
-            'text-only': 'Just Text View',
+            'text-only': 'Simple Text View',
             'print': 'Printable View'
         };
         this.showToast(`Switched to ${viewNames[viewName]}`);
@@ -459,7 +459,7 @@ const UI = {
         // Update dropdown label
         const viewLabels = {
             'clean': 'Clean',
-            'text-only': 'Just Text',
+            'text-only': 'Simple Text',
             'print': 'Printable'
         };
         if (this.elements.viewSelectorLabel) {
@@ -505,9 +505,11 @@ const UI = {
         // Set metadata if available
         if (data.metadata) {
             this.renderMetadata(data.metadata);
+            this.renderDescription(data.metadata.description);
         } else {
             this.elements.recipeMetadata.innerHTML = '';
             this.elements.recipeMetadata.style.display = 'none';
+            document.getElementById('recipe-description').style.display = 'none';
         }
 
         // Render ingredients
@@ -847,6 +849,118 @@ const UI = {
         } catch (e) {
             this.elements.recipeSource.style.display = 'none';
         }
+    },
+
+    renderDescription(description) {
+        const descriptionEl = document.getElementById('recipe-description');
+        const descriptionText = document.getElementById('description-text');
+        const readMoreBtn = document.getElementById('read-more-btn');
+        
+        if (!description || !description.trim()) {
+            descriptionEl.style.display = 'none';
+            return;
+        }
+        
+        descriptionText.textContent = description;
+        descriptionEl.style.display = 'block';
+        
+        // Show "Read More" button if description is longer than 200 characters
+        if (description.length > 200) {
+            readMoreBtn.style.display = 'inline-block';
+            descriptionText.classList.add('truncated');
+            
+            // Toggle expanded state
+            readMoreBtn.onclick = () => {
+                const isTruncated = descriptionText.classList.contains('truncated');
+                if (isTruncated) {
+                    descriptionText.classList.remove('truncated');
+                    readMoreBtn.textContent = 'Read Less';
+                } else {
+                    descriptionText.classList.add('truncated');
+                    readMoreBtn.textContent = 'Read More';
+                }
+            };
+        } else {
+            readMoreBtn.style.display = 'none';
+            descriptionText.classList.remove('truncated');
+        }
+    },
+
+    renderTaxonomy(metadata) {
+        const taxonomyEl = document.getElementById('recipe-taxonomy');
+        
+        if (!metadata) {
+            taxonomyEl.style.display = 'none';
+            return;
+        }
+        
+        const items = [];
+        
+        // Add category
+        if (metadata.category && Array.isArray(metadata.category) && metadata.category.length > 0) {
+            const categories = metadata.category.slice(0, 3);
+            const categoryText = categories.join(', ') + (metadata.category.length > 3 ? '...' : '');
+            items.push(`<span class="taxonomy-item"><span class="taxonomy-label">Category:</span> ${categoryText}</span>`);
+        }
+        
+        // Add cuisine
+        if (metadata.cuisine && Array.isArray(metadata.cuisine) && metadata.cuisine.length > 0) {
+            const cuisines = metadata.cuisine.slice(0, 3);
+            const cuisineText = cuisines.join(', ') + (metadata.cuisine.length > 3 ? '...' : '');
+            items.push(`<span class="taxonomy-item"><span class="taxonomy-label">Cuisine:</span> ${cuisineText}</span>`);
+        }
+        
+        // Add keywords (show first 5)
+        if (metadata.keywords && Array.isArray(metadata.keywords) && metadata.keywords.length > 0) {
+            const keywords = metadata.keywords.slice(0, 5);
+            const keywordText = keywords.join(', ') + (metadata.keywords.length > 5 ? '...' : '');
+            items.push(`<span class="taxonomy-item"><span class="taxonomy-label">Tags:</span> ${keywordText}</span>`);
+        }
+        
+        if (items.length > 0) {
+            taxonomyEl.innerHTML = items.join('');
+            taxonomyEl.style.display = 'flex';
+        } else {
+            taxonomyEl.style.display = 'none';
+        }
+    },
+
+    renderRating(rating) {
+        const ratingEl = document.getElementById('recipe-rating');
+        
+        if (!rating || !rating.value) {
+            ratingEl.style.display = 'none';
+            return;
+        }
+        
+        const ratingValue = parseFloat(rating.value);
+        const ratingCount = parseInt(rating.count);
+        
+        if (isNaN(ratingValue) || ratingValue <= 0) {
+            ratingEl.style.display = 'none';
+            return;
+        }
+        
+        // Create star visualization
+        const fullStars = Math.floor(ratingValue);
+        const hasHalfStar = (ratingValue % 1) >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+        
+        const starsHTML = 
+            '★'.repeat(fullStars) + 
+            (hasHalfStar ? '⯨' : '') + 
+            '☆'.repeat(emptyStars);
+        
+        const countText = ratingCount && !isNaN(ratingCount) && ratingCount > 0 
+            ? ` <span class="rating-count">(${ratingCount.toLocaleString()} ${ratingCount === 1 ? 'review' : 'reviews'})</span>` 
+            : '';
+        
+        ratingEl.innerHTML = `
+            <span class="stars">${starsHTML}</span>
+            <span class="rating-value">${ratingValue.toFixed(1)}/5</span>
+            ${countText}
+        `;
+        ratingEl.style.display = 'flex';
     },
 
     copyIngredientsToClipboard() {

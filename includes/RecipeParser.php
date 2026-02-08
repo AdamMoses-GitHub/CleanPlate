@@ -303,6 +303,101 @@ class RecipeParser {
             $normalized['metadata']['imageCandidates'] = $imageCandidates;
         }
         
+        // Extract description
+        if (isset($recipe['description'])) {
+            $description = $this->cleanText($recipe['description']);
+            // Limit description length for sanity
+            if (strlen($description) > 0) {
+                $normalized['metadata']['description'] = $description;
+            }
+        }
+        
+        // Extract category (handle array or string)
+        if (isset($recipe['recipeCategory'])) {
+            $category = $recipe['recipeCategory'];
+            if (is_string($category)) {
+                $category = [$category];
+            }
+            if (is_array($category)) {
+                $category = array_filter(array_map([$this, 'cleanText'], $category), function($val) {
+                    return $this->isValidTaxonomy($val);
+                });
+                if (!empty($category)) {
+                    $normalized['metadata']['category'] = array_values($category);
+                }
+            }
+        }
+        
+        // Extract cuisine (handle array or string)
+        if (isset($recipe['recipeCuisine'])) {
+            $cuisine = $recipe['recipeCuisine'];
+            if (is_string($cuisine)) {
+                $cuisine = [$cuisine];
+            }
+            if (is_array($cuisine)) {
+                $cuisine = array_filter(array_map([$this, 'cleanText'], $cuisine), function($val) {
+                    return $this->isValidTaxonomy($val);
+                });
+                if (!empty($cuisine)) {
+                    $normalized['metadata']['cuisine'] = array_values($cuisine);
+                }
+            }
+        }
+        
+        // Extract keywords (handle array or comma-separated string)
+        if (isset($recipe['keywords'])) {
+            $keywords = $recipe['keywords'];
+            if (is_string($keywords)) {
+                $keywords = array_map('trim', explode(',', $keywords));
+            }
+            if (is_array($keywords)) {
+                $keywords = array_filter(array_map([$this, 'cleanText'], $keywords), function($val) {
+                    return strlen($val) > 2 && strlen($val) < 50;
+                });
+                // Remove duplicates and limit to 20 keywords
+                $keywords = array_unique($keywords);
+                if (!empty($keywords)) {
+                    $normalized['metadata']['keywords'] = array_values(array_slice($keywords, 0, 20));
+                }
+            }
+        }
+        
+        // Extract aggregate rating
+        if (isset($recipe['aggregateRating'])) {
+            $rating = $recipe['aggregateRating'];
+            $ratingValue = null;
+            $ratingCount = null;
+            
+            if (isset($rating['ratingValue'])) {
+                $ratingValue = floatval($rating['ratingValue']);
+                // Validate rating is in reasonable range
+                if ($ratingValue >= 0 && $ratingValue <= 5) {
+                    $ratingValue = round($ratingValue, 1);
+                } else {
+                    $ratingValue = null;
+                }
+            }
+            
+            if (isset($rating['ratingCount'])) {
+                $ratingCount = intval($rating['ratingCount']);
+                if ($ratingCount <= 0) {
+                    $ratingCount = null;
+                }
+            } elseif (isset($rating['reviewCount'])) {
+                $ratingCount = intval($rating['reviewCount']);
+                if ($ratingCount <= 0) {
+                    $ratingCount = null;
+                }
+            }
+            
+            if ($ratingValue !== null && $ratingCount !== null) {
+                $normalized['metadata']['rating'] = [
+                    'value' => $ratingValue,
+                    'count' => $ratingCount
+                ];
+            }
+        }
+        
         // Extract author (JSON-LD -> meta tags -> DOM patterns)
         $author = $this->extractAuthor($recipe, $html);
         if ($author !== null) {
@@ -572,6 +667,84 @@ class RecipeParser {
     }
     
     /**
+     * Validate taxonomy values (category, cuisine)
+     * Filter out empty, generic, or invalid values
+     * 
+     * @param string $value Taxonomy value to validate
+     * @return bool True if valid
+     */
+    private function isValidTaxonomy($value) {
+        if (!is_string($value) || strlen($value) < 3 || strlen($value) > 50) {
+            return false;
+        }
+        
+        // Blacklist generic/useless values
+        $blacklist = ['recipe', 'recipes', 'food', 'cooking', 'dish', 'dishes'];
+        $lowerValue = strtolower(trim($value));
+        
+        if (in_array($lowerValue, $blacklist)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Extract meta tag content by name or property
+     * 
+     * @param string $html Full HTML content
+     * @param string $name Meta tag name or property
+     * @return string|null Content or null
+     */
+    private function extractMetaTag($html, $name) {
+        // Try name attribute
+        $pattern = '/<meta\s+name=["\']' . preg_quote($name, '/') . '["\']\s+content=["\'](.*?)["\']/i';
+        if (preg_match($pattern, $html, $matches)) {
+            return trim($matches[1]);
+        }
+        
+        // Try property attribute (Open Graph)
+        $pattern = '/<meta\s+property=["\'](?:og:)?' . preg_quote($name, '/') . '["\']\s+content=["\'](.*?)["\']/i';
+        if (preg_match($pattern, $html, $matches)) {
+            return trim($matches[1]);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract keywords from meta tags
+     * 
+     * @param string $html Full HTML content
+     * @return array Keywords array or empty
+     */
+    private function extractKeywordsFromMeta($html) {
+        // Try various meta tag patterns for keywords
+        $patterns = [
+            '/<meta\s+name=["\']keywords["\']\s+content=["\'](.*?)["\']/i',
+            '/<meta\s+name=["\']parsely-tags["\']\s+content=["\'](.*?)["\']/i',
+            '/<meta\s+property=["\']article:tag["\']\s+content=["\'](.*?)["\']/i',
+        ];
+        
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $keywordsStr = trim($matches[1]);
+                if (!empty($keywordsStr)) {
+                    $keywords = array_map('trim', explode(',', $keywordsStr));
+                    $keywords = array_filter($keywords, function($val) {
+                        return strlen($val) > 2 && strlen($val) < 50;
+                    });
+                    if (!empty($keywords)) {
+                        return array_values(array_unique(array_slice($keywords, 0, 20)));
+                    }
+                }
+            }
+        }
+        
+        return [];
+    }
+    
+    /**
      * Phase 2: Extract recipe from DOM heuristics
      */
     private function extractFromDom($html, $url) {
@@ -627,6 +800,18 @@ class RecipeParser {
             if (!isset($metadata['imageUrl']) && isset($imageCandidates[0])) {
                 $metadata['imageUrl'] = $imageCandidates[0]['url'];
             }
+        }
+        
+        // Extract description from meta tags (Phase 2 fallback)
+        $description = $this->extractMetaTag($html, 'description');
+        if ($description && strlen($description) > 0) {
+            $metadata['description'] = $this->cleanText($description);
+        }
+        
+        // Extract keywords from meta tags (Phase 2 fallback)
+        $keywords = $this->extractKeywordsFromMeta($html);
+        if (!empty($keywords)) {
+            $metadata['keywords'] = $keywords;
         }
         
         // Extract author (using meta tags and DOM patterns only, no JSON-LD available in Phase 2)
@@ -740,33 +925,66 @@ class RecipeParser {
             'max' => 20
         ];
         
-        // Metadata completeness (10 points - 2 per field)
+        // Metadata completeness (15 points - weighted by importance)
         // Ensure metadata array exists, default to empty array
         $metadata = $data['metadata'] ?? [];
         if (!is_array($metadata)) {
             $metadata = [];
         }
         
-        $metadataFields = ['prepTime', 'cookTime', 'totalTime', 'servings', 'imageUrl'];
+        // Traditional metadata (1 point each, 5 total)
+        $traditionalFields = ['prepTime', 'cookTime', 'totalTime', 'servings', 'imageUrl'];
+        // Phase 1 metadata (weighted by importance)
+        $phase1Fields = [
+            'description' => 2,  // 2 points
+            'rating' => 2,       // 2 points
+            'category' => 1,     // 1 point
+            'cuisine' => 1,      // 1 point
+            'keywords' => 1      // 1 point
+        ];
+        
         $metadataPresent = 0;
         $metadataPoints = 0;
         
-        foreach ($metadataFields as $field) {
+        // Score traditional metadata fields
+        foreach ($traditionalFields as $field) {
             $value = $metadata[$field] ?? null;
             
             // Treat empty strings as missing
             if (!empty($value) && is_scalar($value)) {
                 $metadataPresent++;
-                $metadataPoints += 2;
+                $metadataPoints += 1;
+            }
+        }
+        
+        // Score Phase 1 metadata fields
+        foreach ($phase1Fields as $field => $points) {
+            $value = $metadata[$field] ?? null;
+            
+            // Special handling for rating (must have both value and count)
+            if ($field === 'rating') {
+                if (is_array($value) && isset($value['value']) && isset($value['count'])) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                }
+            } else {
+                // For arrays, check if not empty
+                if (is_array($value) && !empty($value)) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                } elseif (!empty($value) && is_scalar($value)) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                }
             }
         }
         
         $score += $metadataPoints;
         $factors['metadata'] = [
             'fieldsPresent' => $metadataPresent,
-            'fieldsTotal' => count($metadataFields),
+            'fieldsTotal' => count($traditionalFields) + count($phase1Fields),
             'points' => $metadataPoints,
-            'max' => 10
+            'max' => 15
         ];
         
         // Quality bonuses and penalties
