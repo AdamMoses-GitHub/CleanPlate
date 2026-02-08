@@ -309,6 +309,7 @@ const UI = {
         ingredientsList: document.getElementById('ingredients-list'),
         instructionsList: document.getElementById('instructions-list'),
         copyIngredientsBtn: document.getElementById('copy-ingredients-btn'),
+        copyInstructionsBtn: document.getElementById('copy-instructions-btn'),
         printBtn: document.getElementById('print-btn'),
         recipeImageContainer: document.getElementById('recipe-image-container'),
         recipeImage: document.getElementById('recipe-image'),
@@ -322,8 +323,13 @@ const UI = {
         carouselNext: document.getElementById('carousel-next'),
         carouselConfirm: document.getElementById('carousel-confirm'),
         carouselHide: document.getElementById('carousel-hide'),
-        toast: document.getElementById('toast-notification')
+        toast: document.getElementById('toast-notification'),
+        viewSelectorBtn: document.getElementById('view-selector-btn'),
+        viewSelectorLabel: document.getElementById('view-selector-label'),
+        viewDropdownMenu: document.getElementById('view-dropdown-menu')
     },
+
+    currentView: 'clean',
 
     showLoading() {
         this.elements.btnText.style.display = 'none';
@@ -363,6 +369,102 @@ const UI = {
         setTimeout(() => {
             this.elements.toast.style.display = 'none';
         }, duration);
+    },
+
+    setView(viewName) {
+        // Validate view name
+        const validViews = ['clean', 'text-only', 'print'];
+        if (!validViews.includes(viewName)) {
+            viewName = 'clean';
+        }
+
+        // Update current view
+        this.currentView = viewName;
+
+        // Update body data attribute
+        document.body.setAttribute('data-view', viewName);
+
+        // Update dropdown label
+        const viewLabels = {
+            'clean': 'Clean',
+            'text-only': 'Just Text',
+            'print': 'Printable'
+        };
+        if (this.elements.viewSelectorLabel) {
+            this.elements.viewSelectorLabel.textContent = `View: ${viewLabels[viewName]}`;
+        }
+
+        // Close dropdown
+        this.closeViewDropdown();
+
+        // Save preference to localStorage
+        this.saveViewPreference(viewName);
+
+        // Show toast notification
+        const viewNames = {
+            'clean': 'Clean View',
+            'text-only': 'Just Text View',
+            'print': 'Printable View'
+        };
+        this.showToast(`Switched to ${viewNames[viewName]}`);
+    },
+
+    toggleViewDropdown() {
+        if (this.elements.viewDropdownMenu.style.display === 'none') {
+            this.elements.viewDropdownMenu.style.display = 'block';
+            this.elements.viewSelectorBtn.classList.add('open');
+        } else {
+            this.closeViewDropdown();
+        }
+    },
+
+    closeViewDropdown() {
+        if (this.elements.viewDropdownMenu) {
+            this.elements.viewDropdownMenu.style.display = 'none';
+        }
+        if (this.elements.viewSelectorBtn) {
+            this.elements.viewSelectorBtn.classList.remove('open');
+        }
+    },
+
+    saveViewPreference(viewName) {
+        try {
+            localStorage.setItem('cleanplate_view_preference', viewName);
+        } catch (e) {
+            console.warn('Failed to save view preference:', e);
+        }
+    },
+
+    loadViewPreference() {
+        try {
+            const saved = localStorage.getItem('cleanplate_view_preference');
+            if (saved && ['clean', 'text-only', 'print'].includes(saved)) {
+                return saved;
+            }
+        } catch (e) {
+            console.warn('Failed to load view preference:', e);
+        }
+        return 'clean';
+    },
+
+    initializeView() {
+        const savedView = this.loadViewPreference();
+        // Set view without showing toast on initial load
+        const validViews = ['clean', 'text-only', 'print'];
+        const viewName = validViews.includes(savedView) ? savedView : 'clean';
+        
+        this.currentView = viewName;
+        document.body.setAttribute('data-view', viewName);
+        
+        // Update dropdown label
+        const viewLabels = {
+            'clean': 'Clean',
+            'text-only': 'Just Text',
+            'print': 'Printable'
+        };
+        if (this.elements.viewSelectorLabel) {
+            this.elements.viewSelectorLabel.textContent = `View: ${viewLabels[viewName]}`;
+        }
     },
 
     showRecipe(recipeData) {
@@ -749,6 +851,21 @@ const UI = {
         });
     },
 
+    copyInstructionsToClipboard() {
+        const instructions = [];
+        this.elements.instructionsList.querySelectorAll('li').forEach((li, index) => {
+            const text = li.textContent.trim();
+            instructions.push(`${index + 1}. ${text}`);
+        });
+
+        const text = instructions.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('Instructions copied to clipboard!');
+        }).catch(() => {
+            this.showToast('Failed to copy instructions', 3000);
+        });
+    },
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -884,10 +1001,18 @@ class CleanPlateApp {
             UI.hideRecipe();
         });
 
-        // Bind copy ingredients button
-        UI.elements.copyIngredientsBtn.addEventListener('click', () => {
-            UI.copyIngredientsToClipboard();
-        });
+        // Bind copy buttons
+        if (UI.elements.copyIngredientsBtn) {
+            UI.elements.copyIngredientsBtn.addEventListener('click', () => {
+                UI.copyIngredientsToClipboard();
+            });
+        }
+
+        if (UI.elements.copyInstructionsBtn) {
+            UI.elements.copyInstructionsBtn.addEventListener('click', () => {
+                UI.copyInstructionsToClipboard();
+            });
+        }
 
         // Bind print button
         UI.elements.printBtn.addEventListener('click', () => {
@@ -917,6 +1042,39 @@ class CleanPlateApp {
         UI.elements.titleEditBtn.addEventListener('click', () => {
             UI.startTitleEdit();
         });
+
+        // Bind view selector dropdown
+        if (UI.elements.viewSelectorBtn) {
+            UI.elements.viewSelectorBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                UI.toggleViewDropdown();
+            });
+        }
+
+        // Bind view dropdown items
+        if (UI.elements.viewDropdownMenu) {
+            const dropdownItems = UI.elements.viewDropdownMenu.querySelectorAll('.view-dropdown-item');
+            dropdownItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const viewType = item.dataset.view;
+                    UI.setView(viewType);
+                });
+            });
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (UI.elements.viewDropdownMenu && 
+                UI.elements.viewDropdownMenu.style.display !== 'none' &&
+                !UI.elements.viewDropdownMenu.contains(e.target) &&
+                !UI.elements.viewSelectorBtn.contains(e.target)) {
+                UI.closeViewDropdown();
+            }
+        });
+
+        // Initialize view from saved preference
+        UI.initializeView();
     }
 
     async handleFormSubmit() {
