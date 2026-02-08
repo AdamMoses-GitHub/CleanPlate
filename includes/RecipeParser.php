@@ -5,32 +5,46 @@
  */
 
 require_once __DIR__ . '/IngredientFilter.php';
+require_once __DIR__ . '/Config.php';
 
 class RecipeParser {
-    // Configuration constants
-    const MIN_REQUEST_DELAY = 2;  // seconds between requests to same domain
-    const MAX_REDIRECTS = 5;      // maximum redirect hops
-    const REQUEST_TIMEOUT = 10;   // timeout in seconds
+    // Configuration (loaded from config files)
+    private $minRequestDelay;
+    private $maxRedirects;
+    private $timeout;
+    private $userAgents;
+    private $sslVerify;
+    private $httpVersion;
+    private $headers;
     
-    // User-agent pool for rotation
-    private $userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    ];
-    
-    private $timeout = self::REQUEST_TIMEOUT;
+    // Other properties
     private $cookieFile = null;
-    private $debugLogging = false;  // Enable to log confidence scores for analysis
+    private $debugLogging = false;
     private $ingredientFilter = null;
     
     /**
      * Constructor - optionally enable debug logging
+     * Accepts optional config array for backwards compatibility
      */
-    public function __construct($debugLogging = false) {
+    public function __construct($debugLogging = false, $config = null) {
+        // Load configuration system
+        if (!class_exists('Config') || !Config::has('app.name')) {
+            Config::load();
+        }
+        
+        // Load settings from config or use defaults
+        $this->minRequestDelay = Config::get('scraper.timeouts.min_delay', 2);
+        $this->maxRedirects = Config::get('scraper.timeouts.max_redirects', 5);
+        $this->timeout = Config::get('scraper.timeouts.request', 10);
+        $this->userAgents = Config::get('scraper.user_agents', [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]);
+        $this->sslVerify = Config::get('scraper.ssl.verify_peer', true);
+        $this->httpVersion = Config::get('scraper.http.version', '2.0');
+        $this->headers = Config::get('scraper.headers', []);
+        
         $this->debugLogging = $debugLogging;
+        
         // Initialize ingredient filter with balanced strictness
         $this->ingredientFilter = new IngredientFilter(
             IngredientFilter::STRICTNESS_BALANCED,
@@ -122,34 +136,21 @@ class RecipeParser {
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => self::MAX_REDIRECTS,
+            CURLOPT_MAXREDIRS => $this->maxRedirects,
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_USERAGENT => $userAgent,
-            // SECURITY: Enable SSL verification (critical for security)
-            CURLOPT_SSL_VERIFYPEER => true,
+            // SECURITY: SSL verification (configured via settings)
+            CURLOPT_SSL_VERIFYPEER => $this->sslVerify,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_ENCODING => '',  // Accept gzip, deflate, br
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_2_0,  // HTTP/2 for modern browsers
+            CURLOPT_HTTP_VERSION => $this->httpVersion === '2.0' ? CURL_HTTP_VERSION_2_0 : CURL_HTTP_VERSION_1_1,
             
             // Cookie persistence for session tracking
             CURLOPT_COOKIEJAR => $this->cookieFile,
             CURLOPT_COOKIEFILE => $this->cookieFile,
             
-            // Comprehensive browser-like headers
-            CURLOPT_HTTPHEADER => [
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language: en-US,en;q=0.9',
-                'Accept-Encoding: gzip, deflate, br',
-                'DNT: 1',
-                'Connection: keep-alive',
-                'Upgrade-Insecure-Requests: 1',
-                'Sec-Fetch-Dest: document',
-                'Sec-Fetch-Mode: navigate',
-                'Sec-Fetch-Site: none',
-                'Sec-Fetch-User: ?1',
-                'Cache-Control: max-age=0',
-                'Referer: https://www.google.com/',
-            ]
+            // Comprehensive browser-like headers (from config or defaults)
+            CURLOPT_HTTPHEADER => $this->buildHeaders(),
         ]);
         
         $html = curl_exec($ch);
@@ -1195,13 +1196,43 @@ class RecipeParser {
             $elapsed = time() - $lastRequest;
             
             // If less than minimum delay, sleep for the remainder
-            if ($elapsed < self::MIN_REQUEST_DELAY) {
-                sleep(self::MIN_REQUEST_DELAY - $elapsed);
+            if ($elapsed < $this->minRequestDelay) {
+                sleep($this->minRequestDelay - $elapsed);
             }
         }
         
         // Update last request time for this domain
         $_SESSION['domain_requests'][$domain] = time();
+    }
+    
+    /**
+     * Build HTTP headers from configuration
+     */
+    private function buildHeaders() {
+        $defaultHeaders = [
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language: en-US,en;q=0.9',
+            'Accept-Encoding: gzip, deflate, br',
+            'DNT: 1',
+            'Connection: keep-alive',
+            'Upgrade-Insecure-Requests: 1',
+            'Sec-Fetch-Dest: document',
+            'Sec-Fetch-Mode: navigate',
+            'Sec-Fetch-Site: none',
+            'Sec-Fetch-User: ?1',
+            'Cache-Control: max-age=0',
+        ];
+        
+        // Merge with configured headers
+        if (!empty($this->headers)) {
+            $configHeaders = [];
+            foreach ($this->headers as $key => $value) {
+                $configHeaders[] = "$key: $value";
+            }
+            return array_merge($defaultHeaders, $configHeaders);
+        }
+        
+        return $defaultHeaders;
     }
     
     /**

@@ -1,32 +1,35 @@
-# IDE and Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Logs
-*.log
-error_log
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Composer dependencies (if added later)
-/vendor/
 
 # Environment files
 .env
 .env.local
+.env.*.local
+.env.development
+.env.staging
+.env.production
 
-# Session files
-sessions/
-/docker-compose.yaml
-/example
+# Config with secrets
+config/local/
+config/*.local.php
+
+# Storage
+storage/cache/*
+storage/logs/*
+storage/temp/*
+!storage/.gitkeep
+!storage/cache/.gitkeep
+!storage/logs/.gitkeep
+!storage/temp/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
+node_modules/

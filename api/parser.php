@@ -4,28 +4,18 @@
  * Accepts POST requests with recipe URLs and returns JSON responses
  */
 
-// Enable error reporting for development (disable in production)
+// Load configuration system
+require_once __DIR__ . '/../includes/Config.php';
+Config::load();
+
+// Configure PHP based on app settings
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Don't display errors to client
+ini_set('display_errors', Config::get('app.debug', false) ? '1' : '0');
 ini_set('log_errors', 1);
+set_time_limit(Config::get('scraper.timeouts.request', 30));
 
 // Configuration: Enable confidence score logging
-// Set CONFIDENCE_DEBUG environment variable or edit this variable to enable logging
-// 
-// Example usage:
-//   - Set environment variable: CONFIDENCE_DEBUG=1
-//   - Or edit this file: $debugConfidenceScoring = true;
-// 
-// Log format example:
-//   [2026-02-06 10:30:45] CONFIDENCE | allrecipes.com | Phase 1 | Score: 85/100 (HIGH) | 
-//   Phase=40/40, Title=10/10, Ingredients=20/20(8), Instructions=20/20(6), Metadata=8/10(4/5), Quality=+5
-// 
-$debugConfidenceScoring = getenv('CONFIDENCE_DEBUG') !== false 
-    ? (bool)getenv('CONFIDENCE_DEBUG') 
-    : false;
-
-// Set execution timeout
-set_time_limit(30);
+$debugConfidenceScoring = Config::env('CONFIDENCE_DEBUG', false);
 
 // Include the parser class
 require_once __DIR__ . '/../includes/RecipeParser.php';
@@ -33,21 +23,22 @@ require_once __DIR__ . '/../includes/RecipeParser.php';
 // Set JSON response headers
 header('Content-Type: application/json; charset=utf-8');
 
-// SECURITY: Restrict CORS in production
-// TODO: Replace * with your actual domain(s)
-$allowedOrigins = ['*']; // Change to ['https://yourdomain.com'] in production
+// CORS configuration
+$allowedOrigins = Config::get('security.cors.allowed_origins', ['*']);
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array('*', $allowedOrigins) || in_array($origin, $allowedOrigins)) {
     header('Access-Control-Allow-Origin: ' . (in_array('*', $allowedOrigins) ? '*' : $origin));
 }
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+$allowedMethods = Config::get('security.cors.allowed_methods', ['POST', 'OPTIONS']);
+$allowedHeaders = Config::get('security.cors.allowed_headers', ['Content-Type']);
+header('Access-Control-Allow-Methods: ' . implode(', ', $allowedMethods));
+header('Access-Control-Allow-Headers: ' . implode(', ', $allowedHeaders));
 
-// SECURITY: Add security headers
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('X-XSS-Protection: 1; mode=block');
-header('Referrer-Policy: strict-origin-when-cross-origin');
+// Security headers
+$securityHeaders = Config::get('security.headers', []);
+foreach ($securityHeaders as $header => $value) {
+    header("$header: $value");
+}
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -75,8 +66,9 @@ if (empty($url)) {
 }
 
 // SECURITY: Validate URL length to prevent buffer attacks
-if (strlen($url) > 2048) {
-    respondWithError(400, 'INVALID_URL', 'URL is too long (maximum 2048 characters).');
+$maxUrlLength = Config::get('security.validation.max_url_length', 2048);
+if (strlen($url) > $maxUrlLength) {
+    respondWithError(400, 'INVALID_URL', "URL is too long (maximum $maxUrlLength characters).");
 }
 
 if (!filter_var($url, FILTER_VALIDATE_URL)) {
@@ -130,32 +122,34 @@ if (isset($parsedUrl['host'])) {
 }
 
 // Simple rate limiting (session-based)
-session_start();
-$rateLimit = 10; // requests
-$ratePeriod = 60; // seconds
+if (Config::get('security.rate_limit.enabled', true)) {
+    session_start();
+    $rateLimit = Config::get('security.rate_limit.requests', 10);
+    $ratePeriod = Config::get('security.rate_limit.period', 60);
 
-if (!isset($_SESSION['api_requests'])) {
-    $_SESSION['api_requests'] = [];
-}
-
-$now = time();
-$_SESSION['api_requests'] = array_filter(
-    $_SESSION['api_requests'],
-    function($timestamp) use ($now, $ratePeriod) {
-        return $timestamp > ($now - $ratePeriod);
+    if (!isset($_SESSION['api_requests'])) {
+        $_SESSION['api_requests'] = [];
     }
-);
 
-if (count($_SESSION['api_requests']) >= $rateLimit) {
-    respondWithError(
-        429,
-        'RATE_LIMIT',
-        'Too many requests. Please wait a moment and try again.',
-        ['You can process up to ' . $rateLimit . ' recipes per minute.']
+    $now = time();
+    $_SESSION['api_requests'] = array_filter(
+        $_SESSION['api_requests'],
+        function($timestamp) use ($now, $ratePeriod) {
+            return $timestamp > ($now - $ratePeriod);
+        }
     );
-}
 
-$_SESSION['api_requests'][] = $now;
+    if (count($_SESSION['api_requests']) >= $rateLimit) {
+        respondWithError(
+            429,
+            'RATE_LIMIT',
+            'Too many requests. Please wait a moment and try again.',
+            ['You can process up to ' . $rateLimit . ' recipes per minute.']
+        );
+    }
+
+    $_SESSION['api_requests'][] = $now;
+}
 
 // Parse the recipe
 try {

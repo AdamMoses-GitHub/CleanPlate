@@ -16,6 +16,101 @@ The **solution**: CleanPlate extracts the actual recipe—ingredients and instru
 
 ---
 
+## Configuration
+
+CleanPlate uses environment variables for configuration, making it easy to customize behavior without modifying code.
+
+### Quick Start
+
+1. **Copy the example configuration:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit your settings:**
+   ```bash
+   # Open .env in your editor
+   nano .env
+   ```
+
+3. **Set your environment:**
+   ```bash
+   # Development (shows errors, debug info)
+   APP_ENV=development
+   APP_DEBUG=true
+   
+   # Production (secure, no debug output)
+   APP_ENV=production
+   APP_DEBUG=false
+   ```
+
+### Key Configuration Options
+
+#### Security Settings
+```bash
+# CORS - Change to your domain in production!
+ALLOWED_ORIGINS=*  # Set to https://yourdomain.com in production
+
+# Rate Limiting (10 requests per 60 seconds)
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=10
+RATE_LIMIT_PERIOD=60
+```
+
+#### Scraper Settings
+```bash
+# Timeouts and delays
+SCRAPER_TIMEOUT=10         # Request timeout in seconds
+SCRAPER_MIN_DELAY=2        # Delay between requests to same domain
+SCRAPER_MAX_REDIRECTS=5    # Maximum redirects to follow
+SCRAPER_SSL_VERIFY=true    # Verify SSL certificates
+```
+
+#### Future Features (Prepared)
+```bash
+# Database (for recipe collections - coming soon)
+DB_HOST=localhost
+DB_DATABASE=cleanplate
+DB_USERNAME=cleanplate_user
+DB_PASSWORD=your_password
+
+# OpenAI (for AI-powered tag generation - coming soon)
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4
+
+# Nutrition APIs (for nutrition data - coming soon)
+NUTRITION_API_KEY=...
+SPOONACULAR_API_KEY=...
+```
+
+### Docker Configuration
+
+When using Docker Compose, environment variables are automatically passed from your `.env` file:
+
+```bash
+# Start with your configuration
+docker-compose up
+
+# Or specify environment inline
+APP_ENV=development docker-compose up
+```
+
+### Testing Configuration
+
+Run the configuration test to verify everything is set up correctly:
+
+```bash
+# Test configuration (in Docker)
+docker exec -it cleanplate-php-server-1 php tests/test-config.php
+
+# Or if running locally
+php tests/test-config.php
+```
+
+**See [.env.example](.env.example) for all available options.**
+
+---
+
 ## What It Does
 
 ### The Main Features
