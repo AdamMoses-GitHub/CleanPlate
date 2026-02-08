@@ -671,6 +671,11 @@ header {
     text-decoration: underline;
 }
 
+#recipe-author {
+    color: var(--color-text-secondary);
+    font-weight: 400;
+}
+
 /* Recipe Metadata */
 .recipe-metadata {
     display: flex;

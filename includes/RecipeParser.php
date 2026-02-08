@@ -303,6 +303,12 @@ class RecipeParser {
             $normalized['metadata']['imageCandidates'] = $imageCandidates;
         }
         
+        // Extract author (JSON-LD -> meta tags -> DOM patterns)
+        $author = $this->extractAuthor($recipe, $html);
+        if ($author !== null) {
+            $normalized['source']['author'] = $author;
+        }
+        
         // Apply post-processing filter to remove navigation/header junk
         if ($this->ingredientFilter) {
             $originalIngredientCount = count($normalized['ingredients']);
@@ -358,6 +364,211 @@ class RecipeParser {
         }
         
         return $result;
+    }
+    
+    /**
+     * Extract author from JSON-LD data and HTML fallback
+     * Priority: JSON-LD author -> meta tags -> DOM patterns
+     * 
+     * @param array $recipe JSON-LD recipe data
+     * @param string $html Full HTML content
+     * @return string|null Author name or null
+     */
+    private function extractAuthor($recipe, $html) {
+        // Priority 1: Extract from JSON-LD recipe data
+        if (isset($recipe['author'])) {
+            $author = $recipe['author'];
+            
+            // Handle Person object
+            if (is_array($author) && isset($author['name'])) {
+                return $this->normalizeAuthor($author['name']);
+            }
+            
+            // Handle Organization object
+            if (is_array($author) && isset($author['@type'])) {
+                if ($author['@type'] === 'Person' && isset($author['name'])) {
+                    return $this->normalizeAuthor($author['name']);
+                }
+                // Skip Organization type - we want individual authors
+                if ($author['@type'] === 'Organization') {
+                    // Fall through to meta tag extraction
+                } else if (isset($author['name'])) {
+                    return $this->normalizeAuthor($author['name']);
+                }
+            }
+            
+            // Handle array of authors
+            if (is_array($author) && isset($author[0])) {
+                $authors = [];
+                foreach ($author as $a) {
+                    if (is_string($a)) {
+                        $authors[] = $this->normalizeAuthor($a);
+                    } elseif (is_array($a) && isset($a['name'])) {
+                        // Skip organizations
+                        if (isset($a['@type']) && $a['@type'] === 'Organization') {
+                            continue;
+                        }
+                        $authors[] = $this->normalizeAuthor($a['name']);
+                    }
+                }
+                if (!empty($authors)) {
+                    return $this->formatMultipleAuthors($authors);
+                }
+            }
+            
+            // Handle simple string
+            if (is_string($author)) {
+                return $this->normalizeAuthor($author);
+            }
+        }
+        
+        // Priority 2: Extract from meta tags
+        $metaAuthor = $this->extractAuthorFromMeta($html);
+        if ($metaAuthor !== null) {
+            return $metaAuthor;
+        }
+        
+        // Priority 3: Extract from DOM patterns
+        $domAuthor = $this->extractAuthorFromDom($html);
+        if ($domAuthor !== null) {
+            return $domAuthor;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract author from meta tags
+     * 
+     * @param string $html Full HTML content
+     * @return string|null Author name or null
+     */
+    private function extractAuthorFromMeta($html) {
+        // Try various meta tag patterns
+        $patterns = [
+            '/<meta\s+name=["\']author["\']\s+content=["\'](.*?)["\']/i',
+            '/<meta\s+property=["\']article:author["\']\s+content=["\'](.*?)["\']/i',
+            '/<meta\s+property=["\']og:article:author["\']\s+content=["\'](.*?)["\']/i',
+            '/<meta\s+name=["\']article:author["\']\s+content=["\'](.*?)["\']/i',
+        ];
+        
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $author = trim($matches[1]);
+                if (!empty($author) && strlen($author) > 2) {
+                    return $this->normalizeAuthor($author);
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract author from DOM patterns (class names, ARIA labels, etc.)
+     * 
+     * @param string $html Full HTML content
+     * @return string|null Author name or null
+     */
+    private function extractAuthorFromDom($html) {
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument();
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        
+        $xpath = new DOMXPath($dom);
+        
+        // Try various XPath patterns for author extraction
+        $patterns = [
+            // Common class patterns
+            "//*[contains(@class, 'author-name')]/text()",
+            "//*[contains(@class, 'byline')]//*[contains(@class, 'author')]/text()",
+            "//*[contains(@class, 'recipe-author')]/text()",
+            "//*[@rel='author']//text()",
+            "//*[contains(@class, 'contributor-name')]/text()",
+            "//*[contains(@class, 'writer')]/text()",
+            // ARIA labels
+            "//*[@aria-label='Author']/text()",
+            "//*[@itemprop='author']//text()",
+            "//*[@itemprop='author']/@content",
+        ];
+        
+        foreach ($patterns as $pattern) {
+            $nodes = $xpath->query($pattern);
+            if ($nodes && $nodes->length > 0) {
+                $author = trim($nodes->item(0)->nodeValue);
+                if (!empty($author) && strlen($author) > 2 && strlen($author) < 100) {
+                    return $this->normalizeAuthor($author);
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Normalize author name by removing prefixes and cleaning up
+     * 
+     * @param string $author Raw author name
+     * @return string Cleaned author name
+     */
+    private function normalizeAuthor($author) {
+        $author = trim($author);
+        
+        // Remove common prefixes
+        $prefixes = ['By ', 'by ', 'BY ', 'Recipe by ', 'Written by ', 'From '];
+        foreach ($prefixes as $prefix) {
+            if (stripos($author, $prefix) === 0) {
+                $author = substr($author, strlen($prefix));
+            }
+        }
+        
+        // Clean up extra whitespace
+        $author = preg_replace('/\s+/', ' ', $author);
+        $author = trim($author);
+        
+        // Basic validation
+        if (strlen($author) < 2 || strlen($author) > 100) {
+            return null;
+        }
+        
+        // Skip if it looks like a site name (e.g., "AllRecipes", "Food Network")
+        $skipPatterns = ['allrecipes', 'food network', 'bon appetit', 'serious eats', 
+                        'epicurious', 'tasty', 'delish', 'the kitchn'];
+        $lowerAuthor = strtolower($author);
+        foreach ($skipPatterns as $pattern) {
+            if (stripos($lowerAuthor, $pattern) !== false) {
+                return null;
+            }
+        }
+        
+        return $author;
+    }
+    
+    /**
+     * Format multiple authors into a readable string
+     * 
+     * @param array $authors Array of author names
+     * @return string Formatted author string
+     */
+    private function formatMultipleAuthors($authors) {
+        $authors = array_filter($authors); // Remove empty values
+        
+        if (empty($authors)) {
+            return null;
+        }
+        
+        if (count($authors) === 1) {
+            return $authors[0];
+        }
+        
+        if (count($authors) === 2) {
+            return implode(' and ', $authors);
+        }
+        
+        // For 3+ authors, use "Author1, Author2, and Author3"
+        $lastAuthor = array_pop($authors);
+        return implode(', ', $authors) . ', and ' . $lastAuthor;
     }
     
     /**
@@ -418,12 +629,22 @@ class RecipeParser {
             }
         }
         
+        // Extract author (using meta tags and DOM patterns only, no JSON-LD available in Phase 2)
+        $source = [
+            'url' => $url,
+            'siteName' => $this->extractDomain($url)
+        ];
+        $author = $this->extractAuthorFromMeta($html);
+        if ($author === null) {
+            $author = $this->extractAuthorFromDom($html);
+        }
+        if ($author !== null) {
+            $source['author'] = $author;
+        }
+        
         return [
             'title' => $title ?: 'Untitled Recipe',
-            'source' => [
-                'url' => $url,
-                'siteName' => $this->extractDomain($url)
-            ],
+            'source' => $source,
             'ingredients' => $ingredients,
             'instructions' => $instructions,
             'metadata' => $metadata

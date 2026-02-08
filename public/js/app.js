@@ -496,7 +496,8 @@ const UI = {
 
         // Set source link
         if (data.source && data.source.url) {
-            this.renderSourceLink(data.source.url);
+            const author = data.source.author || null;
+            this.renderSourceLink(data.source.url, author);
         } else {
             this.elements.recipeSource.style.display = 'none';
         }
@@ -824,13 +825,24 @@ const UI = {
         this.elements.recipeImageContainer.style.display = 'block';
     },
 
-    renderSourceLink(url) {
+    renderSourceLink(url, author = null) {
         try {
             const urlObj = new URL(url);
             const domain = urlObj.hostname.replace(/^www\./, '');
             
             this.elements.recipeSourceLink.href = url;
             this.elements.recipeSourceLink.textContent = domain;
+            
+            // Display author if available
+            const authorElement = document.getElementById('recipe-author');
+            if (author && author.trim()) {
+                authorElement.textContent = ' | By ' + author;
+                authorElement.style.display = 'inline';
+            } else {
+                authorElement.textContent = '';
+                authorElement.style.display = 'none';
+            }
+            
             this.elements.recipeSource.style.display = 'block';
         } catch (e) {
             this.elements.recipeSource.style.display = 'none';
