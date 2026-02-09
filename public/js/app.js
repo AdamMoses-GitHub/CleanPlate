@@ -462,7 +462,7 @@ const UI = {
 
     setView(viewName) {
         // Validate view name
-        const validViews = ['clean', 'text-only', 'print'];
+        const validViews = ['clean', 'extra-info', 'text-only', 'print'];
         if (!validViews.includes(viewName)) {
             viewName = 'clean';
         }
@@ -476,6 +476,7 @@ const UI = {
         // Update dropdown label
         const viewLabels = {
             'clean': 'Clean',
+            'extra-info': 'Extra Info',
             'text-only': 'Simple Text',
             'print': 'Printable'
         };
@@ -488,14 +489,6 @@ const UI = {
 
         // Save preference to localStorage
         this.saveViewPreference(viewName);
-
-        // Show toast notification
-        const viewNames = {
-            'clean': 'Clean View',
-            'text-only': 'Simple Text View',
-            'print': 'Printable View'
-        };
-        this.showToast(`Switched to ${viewNames[viewName]}`);
     },
 
     toggleViewDropdown() {
@@ -527,7 +520,7 @@ const UI = {
     loadViewPreference() {
         try {
             const saved = localStorage.getItem('cleanplate_view_preference');
-            if (saved && ['clean', 'text-only', 'print'].includes(saved)) {
+            if (saved && ['clean', 'extra-info', 'text-only', 'print'].includes(saved)) {
                 return saved;
             }
         } catch (e) {
@@ -539,7 +532,7 @@ const UI = {
     initializeView() {
         const savedView = this.loadViewPreference();
         // Set view without showing toast on initial load
-        const validViews = ['clean', 'text-only', 'print'];
+        const validViews = ['clean', 'extra-info', 'text-only', 'print'];
         const viewName = validViews.includes(savedView) ? savedView : 'clean';
         
         this.currentView = viewName;
@@ -548,6 +541,7 @@ const UI = {
         // Update dropdown label
         const viewLabels = {
             'clean': 'Clean',
+            'extra-info': 'Extra Info',
             'text-only': 'Simple Text',
             'print': 'Printable'
         };
@@ -596,13 +590,19 @@ const UI = {
             this.renderMetadata(data.metadata);
             this.renderDescription(data.metadata.description);
             this.renderDietaryBadges(data.metadata.dietaryInfo);
+            this.renderDifficulty(data.metadata.difficulty);
             this.renderVideoButton(data.metadata.video);
+            this.renderTaxonomy(data.metadata);
+            this.renderRating(data.metadata.rating);
         } else {
             this.elements.recipeMetadata.innerHTML = '';
             this.elements.recipeMetadata.style.display = 'none';
             document.getElementById('recipe-description').style.display = 'none';
             document.getElementById('dietary-badges').style.display = 'none';
+            document.getElementById('recipe-difficulty').style.display = 'none';
             document.getElementById('video-btn').style.display = 'none';
+            document.getElementById('recipe-taxonomy').style.display = 'none';
+            document.getElementById('recipe-rating').style.display = 'none';
         }
 
         // Render ingredients
@@ -1044,6 +1044,34 @@ const UI = {
         newBtn.addEventListener('click', () => {
             window.videoModal.open(videoData);
         });
+    },
+
+    renderDifficulty(difficulty) {
+        const difficultyEl = document.getElementById('recipe-difficulty');
+        
+        if (!difficulty) {
+            difficultyEl.style.display = 'none';
+            return;
+        }
+        
+        // Map difficulty levels to emoji and color class
+        const difficultyMap = {
+            'Easy': { emoji: '📊', class: 'difficulty-easy' },
+            'Medium': { emoji: '⚡', class: 'difficulty-medium' },
+            'Hard': { emoji: '🔥', class: 'difficulty-hard' }
+        };
+        
+        const info = difficultyMap[difficulty];
+        if (!info) {
+            difficultyEl.style.display = 'none';
+            return;
+        }
+        
+        difficultyEl.innerHTML = `<span class="difficulty-badge ${info.class}">
+            <span class="difficulty-emoji">${info.emoji}</span>
+            <span class="difficulty-text">${difficulty}</span>
+        </span>`;
+        difficultyEl.style.display = 'flex';
     },
 
     renderTaxonomy(metadata) {

@@ -819,6 +819,50 @@ header {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
+/* Difficulty Badge */
+.recipe-difficulty {
+    display: flex;
+    justify-content: center;
+    margin: 0.75rem 0 1rem 0;
+}
+
+.difficulty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.813rem;
+    font-weight: 600;
+    color: #fff;
+    transition: transform 0.2s ease;
+}
+
+.difficulty-badge:hover {
+    transform: translateY(-1px);
+}
+
+.difficulty-emoji {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.difficulty-text {
+    line-height: 1;
+}
+
+.difficulty-easy {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.difficulty-medium {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.difficulty-hard {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
 /* Recipe Metadata */
 .recipe-metadata {
     display: flex;
@@ -1536,6 +1580,13 @@ main:has(.recipe-view.active) ~ footer .footer-creator {
    VIEW MODES
    ======================================== */
 
+/* Clean View - Hide taxonomy and rating by default */
+body[data-view="clean"] .recipe-taxonomy,
+body[data-view="clean"] .recipe-rating,
+body[data-view="clean"] .recipe-description {
+    display: none !important;
+}
+
 /* Text-Only View */
 body[data-view="text-only"] .recipe-image-container,
 body[data-view="text-only"] .image-hidden-banner,
@@ -1547,6 +1598,10 @@ body[data-view="text-only"] .image-selector-btn,
 body[data-view="text-only"] .image-hidden-change,
 body[data-view="text-only"] .recipe-description,
 body[data-view="text-only"] .dietary-badges,
+body[data-view="text-only"] .recipe-difficulty,
+body[data-view="text-only"] .recipe-taxonomy,
+body[data-view="text-only"] .recipe-rating,
+body[data-view="text-only"] .recipe-metadata,
 body[data-view="text-only"] .video-link {
     display: none !important;
 }
@@ -1609,8 +1664,23 @@ body[data-view="text-only"] .ingredient-bullet {
     display: none;
 }
 
+/* Extra Info View - Shows additional metadata */
+body[data-view="extra-info"] .recipe-taxonomy,
+body[data-view="extra-info"] .recipe-rating {
+    display: flex !important;
+}
+
+/* Hide elements in Extra Info view (same as Clean) */
+body[data-view="extra-info"] .confidence-container,
+body[data-view="extra-info"] .confidence-details {
+    display: none !important;
+}
+
 /* Print View */
 body[data-view="print"] .copy-btn,
+body[data-view="print"] .recipe-difficulty,
+body[data-view="print"] .recipe-taxonomy,
+body[data-view="print"] .recipe-rating,
 body[data-view="print"] .video-link {
     display: none !important;
 }
