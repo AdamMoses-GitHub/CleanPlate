@@ -245,6 +245,95 @@ class ImageCarousel {
     }
 }
 
+// Video Modal Controller
+class VideoModal {
+    constructor() {
+        this.modal = document.getElementById('video-modal');
+        this.backdrop = this.modal.querySelector('.video-modal-backdrop');
+        this.closeBtn = this.modal.querySelector('.video-modal-close');
+        this.playerContainer = document.getElementById('video-modal-player');
+        this.videoData = null;
+        
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        // Close button
+        this.closeBtn.addEventListener('click', () => this.close());
+        
+        // Click backdrop to close
+        this.backdrop.addEventListener('click', () => this.close());
+        
+        // ESC key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.modal.style.display !== 'none') {
+                this.close();
+            }
+        });
+    }
+
+    open(videoData) {
+        this.videoData = videoData;
+        this.renderVideo();
+        this.modal.style.display = 'block';
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
+    }
+
+    close() {
+        this.modal.style.display = 'none';
+        document.body.style.overflow = ''; // Restore scrolling
+        this.playerContainer.innerHTML = ''; // Clear video to stop playback
+    }
+
+    renderVideo() {
+        const { url, platform } = this.videoData;
+        let html = '';
+
+        switch (platform) {
+            case 'youtube':
+                html = `<iframe src="${this.escapeHtml(url)}" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen></iframe>`;
+                break;
+
+            case 'vimeo':
+                html = `<iframe src="${this.escapeHtml(url)}" 
+                    frameborder="0" 
+                    allow="autoplay; fullscreen; picture-in-picture" 
+                    allowfullscreen></iframe>`;
+                break;
+
+            case 'html5':
+                html = `<video controls preload="metadata">
+                    <source src="${this.escapeHtml(url)}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>`;
+                break;
+
+            case 'external':
+            default:
+                // For external/unknown platforms, open in new tab
+                window.open(url, '_blank', 'noopener,noreferrer');
+                this.close();
+                return;
+        }
+
+        this.playerContainer.innerHTML = html;
+    }
+
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+}
+
 // API Client
 class CleanPlateAPI {
     constructor(endpoint = '../api/parser.php') {
@@ -506,10 +595,14 @@ const UI = {
         if (data.metadata) {
             this.renderMetadata(data.metadata);
             this.renderDescription(data.metadata.description);
+            this.renderDietaryBadges(data.metadata.dietaryInfo);
+            this.renderVideoButton(data.metadata.video);
         } else {
             this.elements.recipeMetadata.innerHTML = '';
             this.elements.recipeMetadata.style.display = 'none';
             document.getElementById('recipe-description').style.display = 'none';
+            document.getElementById('dietary-badges').style.display = 'none';
+            document.getElementById('video-btn').style.display = 'none';
         }
 
         // Render ingredients
@@ -884,6 +977,73 @@ const UI = {
             readMoreBtn.style.display = 'none';
             descriptionText.classList.remove('truncated');
         }
+    },
+
+    renderDietaryBadges(dietaryInfo) {
+        const badgesEl = document.getElementById('dietary-badges');
+        
+        if (!dietaryInfo || !Array.isArray(dietaryInfo) || dietaryInfo.length === 0) {
+            badgesEl.style.display = 'none';
+            return;
+        }
+        
+        // Map dietary labels to emoji icons and CSS classes
+        const dietaryMap = {
+            'Vegan': { emoji: '🌱', class: 'badge-vegan' },
+            'Vegetarian': { emoji: '🥗', class: 'badge-vegetarian' },
+            'Gluten-Free': { emoji: '🚫', class: 'badge-gluten-free' },
+            'Dairy-Free': { emoji: '🥛', class: 'badge-dairy-free' },
+            'Keto': { emoji: '🥓', class: 'badge-keto' },
+            'Paleo': { emoji: '🦴', class: 'badge-paleo' },
+            'Low-Carb': { emoji: '📉', class: 'badge-low-carb' },
+            'Low-Sodium': { emoji: '🧂', class: 'badge-low-sodium' },
+            'Kosher': { emoji: '✡️', class: 'badge-kosher' },
+            'Halal': { emoji: '☪️', class: 'badge-halal' }
+        };
+        
+        const badges = dietaryInfo
+            .map(label => {
+                const info = dietaryMap[label];
+                if (!info) return null;
+                
+                return `<span class="dietary-badge ${info.class}">
+                    <span class="badge-emoji">${info.emoji}</span>
+                    <span class="badge-text">${label}</span>
+                </span>`;
+            })
+            .filter(badge => badge !== null);
+        
+        if (badges.length > 0) {
+            badgesEl.innerHTML = badges.join('');
+            badgesEl.style.display = 'flex';
+        } else {
+            badgesEl.style.display = 'none';
+        }
+    },
+
+    renderVideoButton(videoData) {
+        const videoBtn = document.getElementById('video-btn');
+        
+        if (!videoData || !videoData.url) {
+            videoBtn.style.display = 'none';
+            return;
+        }
+        
+        // Show the button
+        videoBtn.style.display = 'inline-flex';
+        
+        // Initialize video modal if not already done
+        if (!window.videoModal) {
+            window.videoModal = new VideoModal();
+        }
+        
+        // Remove existing click handler and add new one
+        const newBtn = videoBtn.cloneNode(true);
+        videoBtn.parentNode.replaceChild(newBtn, videoBtn);
+        
+        newBtn.addEventListener('click', () => {
+            window.videoModal.open(videoData);
+        });
     },
 
     renderTaxonomy(metadata) {

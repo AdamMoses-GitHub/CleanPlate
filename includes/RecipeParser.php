@@ -404,6 +404,98 @@ class RecipeParser {
             $normalized['source']['author'] = $author;
         }
         
+        // ===== PHASE 2 METADATA EXTRACTION =====
+        
+        // Extract nutrition information
+        if (isset($recipe['nutrition'])) {
+            $nutrition = $recipe['nutrition'];
+            $nutritionData = [];
+            
+            // Map schema.org nutrition fields to our standardized names
+            $nutritionFields = [
+                'calories' => 'calories',
+                'carbohydrateContent' => 'carbohydrates',
+                'proteinContent' => 'protein',
+                'fatContent' => 'fat',
+                'saturatedFatContent' => 'saturatedFat',
+                'fiberContent' => 'fiber',
+                'sugarContent' => 'sugar',
+                'sodiumContent' => 'sodium',
+                'cholesterolContent' => 'cholesterol',
+                'servingSize' => 'servingSize'
+            ];
+            
+            foreach ($nutritionFields as $schemaField => $ourField) {
+                if (isset($nutrition[$schemaField])) {
+                    $value = $this->normalizeNutritionValue($nutrition[$schemaField]);
+                    if ($value !== null) {
+                        $nutritionData[$ourField] = $value;
+                    }
+                }
+            }
+            
+            // Only store nutrition if we have at least 3 fields (calories + 2 others)
+            if (count($nutritionData) >= 3) {
+                $normalized['metadata']['nutrition'] = $nutritionData;
+            }
+        }
+        
+        // Extract dietary labels
+        if (isset($recipe['suitableForDiet'])) {
+            $dietaryInfo = $recipe['suitableForDiet'];
+            if (is_string($dietaryInfo)) {
+                $dietaryInfo = [$dietaryInfo];
+            }
+            if (is_array($dietaryInfo)) {
+                $cleanedDiets = [];
+                foreach ($dietaryInfo as $diet) {
+                    $normalized = $this->normalizeDietaryLabel($diet);
+                    if ($normalized !== null) {
+                        $cleanedDiets[] = $normalized;
+                    }
+                }
+                if (!empty($cleanedDiets)) {
+                    $normalized['metadata']['dietaryInfo'] = array_values(array_unique($cleanedDiets));
+                }
+            }
+        }
+        
+        // Extract date published
+        if (isset($recipe['datePublished'])) {
+            $datePublished = trim($recipe['datePublished']);
+            if (!empty($datePublished) && strtotime($datePublished) !== false) {
+                $normalized['metadata']['datePublished'] = $datePublished;
+            }
+        }
+        
+        // Extract date modified
+        if (isset($recipe['dateModified'])) {
+            $dateModified = trim($recipe['dateModified']);
+            if (!empty($dateModified) && strtotime($dateModified) !== false) {
+                $normalized['metadata']['dateModified'] = $dateModified;
+            }
+        }
+        
+        // Extract difficulty level
+        $difficultyFields = ['recipeLevel', 'skillLevel', 'difficulty', 'recipeDifficulty'];
+        foreach ($difficultyFields as $field) {
+            if (isset($recipe[$field])) {
+                $difficulty = $this->normalizeDifficulty($recipe[$field]);
+                if ($difficulty !== null) {
+                    $normalized['metadata']['difficulty'] = $difficulty;
+                    break;
+                }
+            }
+        }
+        
+        // Extract video content
+        if (isset($recipe['video'])) {
+            $videoData = $this->extractVideoFromJsonLd($recipe['video']);
+            if ($videoData !== null) {
+                $normalized['metadata']['video'] = $videoData;
+            }
+        }
+        
         // Apply post-processing filter to remove navigation/header junk
         if ($this->ingredientFilter) {
             $originalIngredientCount = count($normalized['ingredients']);
@@ -667,6 +759,258 @@ class RecipeParser {
     }
     
     /**
+     * Normalize nutrition value - extract and validate
+     * 
+     * @param string $value Nutrition value (e.g., "400 kcal", "26 g")
+     * @return string|null Cleaned value or null
+     */
+    private function normalizeNutritionValue($value) {
+        if (!is_string($value)) {
+            return null;
+        }
+        
+        $value = trim($value);
+        if (empty($value)) {
+            return null;
+        }
+        
+        // Extract numeric part
+        preg_match('/[\d.]+/', $value, $matches);
+        if (empty($matches)) {
+            return null;
+        }
+        
+        $numeric = floatval($matches[0]);
+        
+        // Sanity check ranges
+        if (stripos($value, 'cal') !== false || stripos($value, 'kcal') !== false) {
+            // Calories: 0-5000
+            if ($numeric < 0 || $numeric > 5000) {
+                return null;
+            }
+        } elseif (stripos($value, 'g') !== false) {
+            // Grams: 0-500
+            if ($numeric < 0 || $numeric > 500) {
+                return null;
+            }
+        } elseif (stripos($value, 'mg') !== false) {
+            // Milligrams: 0-10000
+            if ($numeric < 0 || $numeric > 10000) {
+                return null;
+            }
+        }
+        
+        return $value;
+    }
+    
+    /**
+     * Normalize dietary label - strip URIs and clean names
+     * 
+     * @param string $label Dietary label (URI or plain text)
+     * @return string|null Cleaned label or null
+     */
+    private function normalizeDietaryLabel($label) {
+        if (!is_string($label)) {
+            return null;
+        }
+        
+        $label = trim($label);
+        if (empty($label)) {
+            return null;
+        }
+        
+        // Strip schema.org URI if present
+        $label = str_replace('http://schema.org/', '', $label);
+        $label = str_replace('https://schema.org/', '', $label);
+        
+        // Map common schema.org diet types to friendly names
+        $dietMap = [
+            'DiabeticDiet' => 'Diabetic-Friendly',
+            'GlutenFreeDiet' => 'Gluten-Free',
+            'HalalDiet' => 'Halal',
+            'HinduDiet' => 'Hindu',
+            'KosherDiet' => 'Kosher',
+            'LowCalorieDiet' => 'Low-Calorie',
+            'LowFatDiet' => 'Low-Fat',
+            'LowLactoseDiet' => 'Low-Lactose',
+            'LowSaltDiet' => 'Low-Sodium',
+            'VeganDiet' => 'Vegan',
+            'VegetarianDiet' => 'Vegetarian',
+        ];
+        
+        // Check if it matches a known diet type
+        foreach ($dietMap as $schemaType => $friendlyName) {
+            if (stripos($label, $schemaType) !== false || stripos($label, $friendlyName) !== false) {
+                return $friendlyName;
+            }
+        }
+        
+        // Handle common variations
+        if (preg_match('/vegan/i', $label)) return 'Vegan';
+        if (preg_match('/vegetarian/i', $label)) return 'Vegetarian';
+        if (preg_match('/gluten[\s-]?free/i', $label)) return 'Gluten-Free';
+        if (preg_match('/dairy[\s-]?free/i', $label)) return 'Dairy-Free';
+        if (preg_match('/keto/i', $label)) return 'Keto';
+        if (preg_match('/paleo/i', $label)) return 'Paleo';
+        if (preg_match('/low[\s-]?carb/i', $label)) return 'Low-Carb';
+        
+        // Return cleaned version if reasonable length
+        if (strlen($label) >= 3 && strlen($label) <= 30) {
+            return ucwords(strtolower($label));
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Normalize difficulty level to standard values
+     * 
+     * @param string $difficulty Raw difficulty value
+     * @return string|null "Easy", "Medium", "Hard" or null
+     */
+    private function normalizeDifficulty($difficulty) {
+        if (!is_string($difficulty)) {
+            return null;
+        }
+        
+        $difficulty = trim(strtolower($difficulty));
+        if (empty($difficulty)) {
+            return null;
+        }
+        
+        // Map to standard levels
+        $easyPatterns = ['easy', 'beginner', 'simple', 'basic'];
+        $mediumPatterns = ['medium', 'intermediate', 'moderate'];
+        $hardPatterns = ['hard', 'difficult', 'advanced', 'expert', 'challenging'];
+        
+        foreach ($easyPatterns as $pattern) {
+            if (stripos($difficulty, $pattern) !== false) {
+                return 'Easy';
+            }
+        }
+        
+        foreach ($mediumPatterns as $pattern) {
+            if (stripos($difficulty, $pattern) !== false) {
+                return 'Medium';
+            }
+        }
+        
+        foreach ($hardPatterns as $pattern) {
+            if (stripos($difficulty, $pattern) !== false) {
+                return 'Hard';
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Extract and normalize video data from JSON-LD Recipe schema
+     * Handles video as URL string or VideoObject
+     * 
+     * @param mixed $video Video data from JSON-LD
+     * @return array|null Video data with url, platform, thumbnail or null
+     */
+    private function extractVideoFromJsonLd($video) {
+        $videoUrl = null;
+        $thumbnailUrl = null;
+        
+        // Handle video as VideoObject
+        if (is_array($video)) {
+            // Prefer embedUrl (already embed-ready)
+            if (isset($video['embedUrl']) && is_string($video['embedUrl'])) {
+                $videoUrl = trim($video['embedUrl']);
+            } elseif (isset($video['contentUrl']) && is_string($video['contentUrl'])) {
+                $videoUrl = trim($video['contentUrl']);
+            } elseif (isset($video['url']) && is_string($video['url'])) {
+                $videoUrl = trim($video['url']);
+            }
+            
+            // Extract thumbnail
+            if (isset($video['thumbnailUrl'])) {
+                if (is_string($video['thumbnailUrl'])) {
+                    $thumbnailUrl = trim($video['thumbnailUrl']);
+                } elseif (is_array($video['thumbnailUrl']) && isset($video['thumbnailUrl'][0])) {
+                    $thumbnailUrl = trim($video['thumbnailUrl'][0]);
+                }
+            }
+        } elseif (is_string($video)) {
+            // Handle video as direct URL string
+            $videoUrl = trim($video);
+        }
+        
+        // Validate URL
+        if (empty($videoUrl) || !filter_var($videoUrl, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+        
+        // Detect platform and convert to embed URL if needed
+        $platform = $this->detectVideoPlatform($videoUrl);
+        $embedUrl = $this->convertToEmbedUrl($videoUrl, $platform);
+        
+        return [
+            'url' => $embedUrl,
+            'platform' => $platform,
+            'thumbnail' => $thumbnailUrl
+        ];
+    }
+    
+    /**
+     * Detect video platform from URL
+     * 
+     * @param string $url Video URL
+     * @return string Platform: youtube, vimeo, html5, external
+     */
+    private function detectVideoPlatform($url) {
+        $urlLower = strtolower($url);
+        
+        if (strpos($urlLower, 'youtube.com') !== false || strpos($urlLower, 'youtu.be') !== false) {
+            return 'youtube';
+        }
+        
+        if (strpos($urlLower, 'vimeo.com') !== false) {
+            return 'vimeo';
+        }
+        
+        // Check for direct video file extensions
+        if (preg_match('/\.(mp4|webm|ogg)($|\?)/i', $url)) {
+            return 'html5';
+        }
+        
+        return 'external';
+    }
+    
+    /**
+     * Convert video URL to embed-ready format
+     * 
+     * @param string $url Original video URL
+     * @param string $platform Detected platform
+     * @return string Embed-ready URL
+     */
+    private function convertToEmbedUrl($url, $platform) {
+        switch ($platform) {
+            case 'youtube':
+                // Extract video ID from YouTube URL
+                if (preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/i', $url, $matches)) {
+                    return 'https://www.youtube.com/embed/' . $matches[1];
+                }
+                return $url;
+                
+            case 'vimeo':
+                // Extract video ID from Vimeo URL
+                if (preg_match('/vimeo\.com\/(?:channels\/[^\/]+\/|groups\/[^\/]+\/videos\/|video\/|)(\d+)/i', $url, $matches)) {
+                    return 'https://player.vimeo.com/video/' . $matches[1];
+                }
+                return $url;
+                
+            case 'html5':
+            case 'external':
+            default:
+                return $url;
+        }
+    }
+    
+    /**
      * Validate taxonomy values (category, cuisine)
      * Filter out empty, generic, or invalid values
      * 
@@ -814,6 +1158,84 @@ class RecipeParser {
             $metadata['keywords'] = $keywords;
         }
         
+        // ===== PHASE 2 FALLBACKS =====
+        
+        // Extract dietary info from keywords (Phase 2 fallback)
+        $dietaryKeywords = ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'keto', 'paleo', 'low-carb'];
+        if (!empty($keywords)) {
+            $dietaryInfo = [];
+            foreach ($keywords as $keyword) {
+                $lowerKeyword = strtolower($keyword);
+                foreach ($dietaryKeywords as $dietKeyword) {
+                    if (stripos($lowerKeyword, $dietKeyword) !== false) {
+                        $normalized = $this->normalizeDietaryLabel($dietKeyword);
+                        if ($normalized !== null && !in_array($normalized, $dietaryInfo)) {
+                            $dietaryInfo[] = $normalized;
+                        }
+                    }
+                }
+            }
+            if (!empty($dietaryInfo)) {
+                $metadata['dietaryInfo'] = $dietaryInfo;
+            }
+        }
+        
+        // Extract dates from meta tags (Phase 2 fallback)
+        $datePublished = $this->extractMetaTag($html, 'article:published_time');
+        if ($datePublished && strtotime($datePublished) !== false) {
+            $metadata['datePublished'] = $datePublished;
+        }
+        
+        $dateModified = $this->extractMetaTag($html, 'article:modified_time');
+        if ($dateModified && strtotime($dateModified) !== false) {
+            $metadata['dateModified'] = $dateModified;
+        }
+        
+        // Extract difficulty from meta tags (Phase 2 fallback)
+        $difficulty = $this->extractMetaTag($html, 'difficulty');
+        if (!$difficulty) {
+            $difficulty = $this->extractMetaTag($html, 'recipe:difficulty');
+        }
+        if ($difficulty) {
+            $normalized = $this->normalizeDifficulty($difficulty);
+            if ($normalized !== null) {
+                $metadata['difficulty'] = $normalized;
+            }
+        }
+        
+        // Extract video from meta tags and embedded content (Phase 2 fallback)
+        $videoUrl = null;
+        
+        // Try Open Graph video tags
+        $videoUrl = $this->extractMetaTag($html, 'og:video:url');
+        if (!$videoUrl) {
+            $videoUrl = $this->extractMetaTag($html, 'og:video');
+        }
+        if (!$videoUrl) {
+            $videoUrl = $this->extractMetaTag($html, 'twitter:player');
+        }
+        
+        // Try to find YouTube or Vimeo iframes in content
+        if (!$videoUrl && preg_match('/<iframe[^>]+src=["\']([^"\']*(?:youtube\.com\/embed|youtu\.be|player\.vimeo\.com)[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+            $videoUrl = $matches[1];
+        }
+        
+        // Try to find HTML5 video elements
+        if (!$videoUrl && preg_match('/<video[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $html, $matches)) {
+            $videoUrl = $matches[1];
+        }
+        
+        if ($videoUrl) {
+            $platform = $this->detectVideoPlatform($videoUrl);
+            $embedUrl = $this->convertToEmbedUrl($videoUrl, $platform);
+            
+            $metadata['video'] = [
+                'url' => $embedUrl,
+                'platform' => $platform,
+                'thumbnail' => null
+            ];
+        }
+        
         // Extract author (using meta tags and DOM patterns only, no JSON-LD available in Phase 2)
         $source = [
             'url' => $url,
@@ -925,7 +1347,7 @@ class RecipeParser {
             'max' => 20
         ];
         
-        // Metadata completeness (15 points - weighted by importance)
+        // Metadata completeness (23 points - weighted by importance)
         // Ensure metadata array exists, default to empty array
         $metadata = $data['metadata'] ?? [];
         if (!is_array($metadata)) {
@@ -941,6 +1363,14 @@ class RecipeParser {
             'category' => 1,     // 1 point
             'cuisine' => 1,      // 1 point
             'keywords' => 1      // 1 point
+        ];
+        // Phase 2 metadata (weighted by importance)
+        $phase2Fields = [
+            'nutrition' => 2,     // 2 points
+            'dietaryInfo' => 2,   // 2 points
+            'datePublished' => 1, // 1 point
+            'dateModified' => 1,  // 1 point
+            'difficulty' => 1     // 1 point
         ];
         
         $metadataPresent = 0;
@@ -979,12 +1409,37 @@ class RecipeParser {
             }
         }
         
+        // Score Phase 2 metadata fields
+        foreach ($phase2Fields as $field => $points) {
+            $value = $metadata[$field] ?? null;
+            
+            // Special handling for nutrition (must have at least 3 fields)
+            if ($field === 'nutrition') {
+                if (is_array($value) && count($value) >= 3) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                }
+            } elseif ($field === 'dietaryInfo') {
+                // Dietary info must be non-empty array
+                if (is_array($value) && !empty($value)) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                }
+            } else {
+                // Dates and difficulty are scalars
+                if (!empty($value) && is_scalar($value)) {
+                    $metadataPresent++;
+                    $metadataPoints += $points;
+                }
+            }
+        }
+        
         $score += $metadataPoints;
         $factors['metadata'] = [
             'fieldsPresent' => $metadataPresent,
-            'fieldsTotal' => count($traditionalFields) + count($phase1Fields),
+            'fieldsTotal' => count($traditionalFields) + count($phase1Fields) + count($phase2Fields),
             'points' => $metadataPoints,
-            'max' => 15
+            'max' => 23
         ];
         
         // Quality bonuses and penalties

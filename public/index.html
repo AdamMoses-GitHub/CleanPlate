@@ -123,6 +123,7 @@
                             <span class="description-text" id="description-text"></span>
                             <button class="read-more-btn" id="read-more-btn" style="display: none;">Read More</button>
                         </div>
+                        <div class="dietary-badges" id="dietary-badges" style="display: none;"></div>
                         <div class="recipe-metadata" id="recipe-metadata"></div>
                         <div class="recipe-taxonomy" id="recipe-taxonomy" style="display: none;"></div>
                         <div class="recipe-rating" id="recipe-rating" style="display: none;"></div>
@@ -130,6 +131,12 @@
                             <span class="source-label">Source:</span>
                             <a id="recipe-source-link" href="#" target="_blank" rel="noopener noreferrer"></a>
                             <span id="recipe-author" style="display: none;"></span>
+                            <span id="video-btn" class="video-link no-print" style="display: none;" title="Watch recipe video">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Recipe Video
+                            </span>
                         </div>
                     </div>
 
@@ -248,6 +255,20 @@
         <footer>
             <p>Powered by CleanPlate &copy; 2026<span class="footer-creator"> | Created By <a href="https://adammoses.com/hello" target="_blank" rel="noopener noreferrer">Adam Moses</a></span></p>
         </footer>
+    </div>
+
+    <!-- Video Modal -->
+    <div id="video-modal" class="video-modal" style="display: none;">
+        <div class="video-modal-backdrop"></div>
+        <div class="video-modal-content">
+            <button class="video-modal-close" title="Close video (ESC)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div class="video-modal-player" id="video-modal-player"></div>
+        </div>
     </div>
 
     <script src="js/app.js"></script>
