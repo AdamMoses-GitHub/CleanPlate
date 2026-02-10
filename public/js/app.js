@@ -336,7 +336,7 @@ class VideoModal {
 
 // API Client
 class CleanPlateAPI {
-    constructor(endpoint = '../api/parser.php') {
+    constructor(endpoint = './api/parser.php') {
         this.endpoint = endpoint;
     }
 
