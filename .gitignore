@@ -35,3 +35,4 @@ vendor/
 node_modules/
 /examples
 .env.prod
+Dockerfile
