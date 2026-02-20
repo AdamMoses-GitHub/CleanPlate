@@ -5,7 +5,7 @@ ini_set('display_errors', 1);
 echo "Testing Config load...\n";
 
 try {
-    require_once __DIR__ . '/../includes/Config.php';
+    require_once __DIR__ . '/../../includes/Config.php';
     echo "Config.php required\n";
     
     Config::load();

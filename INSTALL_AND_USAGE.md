@@ -68,12 +68,12 @@ For rapid testing on your machine:
 
 2. **Start PHP built-in server**:
    ```bash
-   php -S localhost:8080
+   php -S localhost:8080 -t public
    ```
 
 3. **Open in browser**:
    - System check: `http://localhost:8080/tests/system-check.php`
-   - Main app: `http://localhost:8080/public/index.html`
+   - Main app: `http://localhost:8080/`
 
 **Note**: The built-in server is NOT suitable for production (single-threaded, no caching).
 
@@ -84,8 +84,8 @@ For rapid testing on your machine:
 ### Web Interface (Recommended)
 
 1. **Launch the app**:
-   - Local: `http://localhost:8080/public/index.html`
-   - Production: `https://your-domain.com/public/index.html`
+   - Local: `http://localhost:8080/`
+   - Production: `https://your-domain.com/`
 
 2. **Extract a recipe**:
    - Paste a recipe URL (e.g., `https://www.allrecipes.com/recipe/12345/`)

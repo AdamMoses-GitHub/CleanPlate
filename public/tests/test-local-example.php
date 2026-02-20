@@ -7,9 +7,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once __DIR__ . '/../includes/RecipeParser.php';
+require_once __DIR__ . '/../../includes/RecipeParser.php';
 
-$htmlFile = __DIR__ . '/../examples/Grilled Cheese Sandwich Recipe.htm';
+$htmlFile = __DIR__ . '/../../examples/Grilled Cheese Sandwich Recipe.htm';
 
 if (!file_exists($htmlFile)) {
     die("Error: Example file not found at: {$htmlFile}\n");

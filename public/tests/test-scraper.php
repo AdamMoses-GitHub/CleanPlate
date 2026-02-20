@@ -41,7 +41,7 @@ if (!$isCLI) {
     session_start();
 }
 
-require_once __DIR__ . '/../includes/RecipeParser.php';
+require_once __DIR__ . '/../../includes/RecipeParser.php';
 
 // Enable debug logging (CLI: --debug flag, Web: ?debug=1)
 $enableDebugLogging = $isCLI 

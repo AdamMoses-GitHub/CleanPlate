@@ -13,7 +13,7 @@
  * @date 2026-02-06
  */
 
-require_once __DIR__ . '/../includes/IngredientFilter.php';
+require_once __DIR__ . '/../../includes/IngredientFilter.php';
 
 // Detect execution mode
 $isCLI = php_sapi_name() === 'cli';

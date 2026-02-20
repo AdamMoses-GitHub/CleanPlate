@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 
 try {
-    require_once __DIR__ . '/../includes/Config.php';
+    require_once __DIR__ . '/../../includes/Config.php';
     Config::load();
     
     echo json_encode([

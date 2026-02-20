@@ -299,11 +299,11 @@ git clone https://github.com/AdamMoses-GitHub/CleanPlate.git
 cd CleanPlate
 
 # Run system check (optional but recommended)
-php -S localhost:8080
-# Open: http://localhost:8080/system-check.php
+php -S localhost:8080 -t public
+# Open: http://localhost:8080/tests/system-check.php
 
 # Launch the app
-# Open: http://localhost:8080/public/index.html
+# Open: http://localhost:8080/
 # Paste a recipe URL, click Extract
 ```
 

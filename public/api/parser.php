@@ -5,7 +5,7 @@
  */
 
 // Load configuration system
-require_once __DIR__ . '/../includes/Config.php';
+require_once __DIR__ . '/../../includes/Config.php';
 Config::load();
 
 // Configure PHP based on app settings
@@ -18,7 +18,7 @@ set_time_limit(Config::get('scraper.timeouts.request', 30));
 $debugConfidenceScoring = Config::env('CONFIDENCE_DEBUG', false);
 
 // Include the parser class
-require_once __DIR__ . '/../includes/RecipeParser.php';
+require_once __DIR__ . '/../../includes/RecipeParser.php';
 
 // Set JSON response headers
 header('Content-Type: application/json; charset=utf-8');

@@ -181,7 +181,7 @@ exit($failed > 0 ? 1 : 0);
  * Test URL validation logic
  */
 function testUrl($url) {
-    $ch = curl_init('http://localhost:8080/parser.php');
+    $ch = curl_init('http://localhost/api/parser.php');
     
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -220,7 +220,7 @@ function testUrl($url) {
  * Check security headers
  */
 function checkSecurityHeaders() {
-    $ch = curl_init('http://localhost:8080/parser.php');
+    $ch = curl_init('http://localhost/api/parser.php');
     
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,

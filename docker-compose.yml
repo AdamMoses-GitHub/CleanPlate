@@ -1,0 +1,95 @@
+services:
+
+  # ── PHP + Apache ─────────────────────────────────────────────────────────────
+  app:
+    build: .
+    container_name: cleanplate_app
+    restart: unless-stopped
+    ports:
+      - "8080:80"        # Main app  → http://localhost:8080/
+    volumes:
+      - .:/var/www/html  # Live-reload: edit files on host, Apache serves them instantly
+    # Load .env if it exists (Config.php also reads it, so values stay in sync).
+    # First-time setup: cp .env.example .env
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV:   development
+      APP_DEBUG: "true"
+      APP_TIMEZONE: UTC
+      # ── Database (points to the db service below) ──
+      DB_CONNECTION: mysql
+      DB_HOST:     db
+      DB_PORT:     3306
+      DB_DATABASE: cleanplate
+      DB_USERNAME: cleanplate
+      DB_PASSWORD: cleanplate
+      # ── Storage paths inside the container ──
+      TEMP_DIR: /var/www/html/storage/temp
+      LOG_DIR:  /var/www/html/storage/logs
+      # ── Scraper defaults ──
+      SCRAPER_TIMEOUT:       10
+      SCRAPER_MIN_DELAY:     2
+      SCRAPER_MAX_REDIRECTS: 5
+      SCRAPER_SSL_VERIFY:    "true"
+      # ── Security ──
+      ALLOWED_ORIGINS:      "*"
+      RATE_LIMIT_ENABLED:   "true"
+      RATE_LIMIT_REQUESTS:  10
+      RATE_LIMIT_PERIOD:    60
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cleanplate
+
+  # ── MySQL 8 ──────────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: cleanplate_db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"      # Expose so tools like TablePlus / DBeaver can connect
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE:      cleanplate
+      MYSQL_USER:          cleanplate
+      MYSQL_PASSWORD:      cleanplate
+    volumes:
+      - db_data:/var/lib/mysql                   # Persist data across restarts
+      - ./.docker/mysql:/docker-entrypoint-initdb.d  # Drop .sql seed files here
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cleanplate
+
+  # ── phpMyAdmin ────────────────────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: cleanplate_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"        # phpMyAdmin → http://localhost:8081/
+    environment:
+      PMA_HOST:          db
+      PMA_PORT:          3306
+      PMA_USER:          cleanplate
+      PMA_PASSWORD:      cleanplate
+      MYSQL_ROOT_PASSWORD: rootpassword
+      UPLOAD_LIMIT:      64M
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cleanplate
+
+networks:
+  cleanplate:
+    driver: bridge
+
+volumes:
+  db_data:

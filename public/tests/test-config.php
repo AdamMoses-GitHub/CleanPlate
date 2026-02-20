@@ -5,8 +5,8 @@
  * Tests loading, validation, and access to configuration values.
  */
 
-require_once __DIR__ . '/../includes/Config.php';
-require_once __DIR__ . '/../includes/ConfigValidator.php';
+require_once __DIR__ . '/../../includes/Config.php';
+require_once __DIR__ . '/../../includes/ConfigValidator.php';
 
 echo "=== CleanPlate Configuration Test ===\n\n";
 
