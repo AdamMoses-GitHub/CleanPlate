@@ -38,6 +38,13 @@ services:
       RATE_LIMIT_ENABLED:   "true"
       RATE_LIMIT_REQUESTS:  10
       RATE_LIMIT_PERIOD:    60
+      # ── Admin dashboard ──
+      ADMIN_USERNAME:       admin
+      ADMIN_PASSWORD:       changeme
+      # ── Extraction cache ──
+      CACHE_TTL_HOURS:      24
+      # ── Featured carousel ──
+      FEATURED_SUBSET_SIZE: 5
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +54,7 @@ services:
   # ── MySQL 8 ──────────────────────────────────────────────────────────────────
   db:
     image: mysql:8.0
+    platform: linux/amd64  # Or linux/arm64 if you're on a Mac    
     container_name: cleanplate_db
     restart: unless-stopped
     ports:

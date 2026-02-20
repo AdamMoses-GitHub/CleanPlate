@@ -6,13 +6,21 @@
  * Currently prepared for future use.
  */
 
+// Helper: read env var from process env, $_SERVER, or $_ENV — works reliably
+// with mod_php under Apache even when PassEnv is not configured.
+function _db_env(string $key, $default = '') {
+    $v = getenv($key);
+    if ($v !== false && $v !== '') return $v;
+    return $_SERVER[$key] ?? $_ENV[$key] ?? $default;
+}
+
 return [
     /*
     |--------------------------------------------------------------------------
     | Default Database Connection
     |--------------------------------------------------------------------------
     */
-    'default' => getenv('DB_CONNECTION') ?: 'mysql',
+    'default' => _db_env('DB_CONNECTION', 'mysql'),
     
     /*
     |--------------------------------------------------------------------------
@@ -21,15 +29,15 @@ return [
     */
     'connections' => [
         'mysql' => [
-            'driver' => 'mysql',
-            'host' => getenv('DB_HOST') ?: 'localhost',
-            'port' => (int)(getenv('DB_PORT') ?: 3306),
-            'database' => getenv('DB_DATABASE') ?: 'cleanplate',
-            'username' => getenv('DB_USERNAME') ?: 'root',
-            'password' => getenv('DB_PASSWORD') ?: '',
-            'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
-            'collation' => getenv('DB_COLLATION') ?: 'utf8mb4_unicode_ci',
-            'prefix' => getenv('DB_PREFIX') ?: '',
+            'driver'    => 'mysql',
+            'host'      => _db_env('DB_HOST',      'db'),
+            'port'      => (int)_db_env('DB_PORT',  3306),
+            'database'  => _db_env('DB_DATABASE',  'cleanplate'),
+            'username'  => _db_env('DB_USERNAME',  'root'),
+            'password'  => _db_env('DB_PASSWORD',  ''),
+            'charset'   => _db_env('DB_CHARSET',   'utf8mb4'),
+            'collation' => _db_env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix'    => _db_env('DB_PREFIX',    ''),
             'strict' => true,
             'engine' => 'InnoDB',
             

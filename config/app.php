@@ -86,4 +86,17 @@ return [
         'level' => getenv('LOG_LEVEL') ?: 'info',
         'file' => 'cleanplate.log',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Dashboard
+    |--------------------------------------------------------------------------
+    */
+    'admin' => [
+        // Read via all three env channels for reliability under Apache mod_php
+        'username'             => (getenv('ADMIN_USERNAME') ?: ($_SERVER['ADMIN_USERNAME'] ?? $_ENV['ADMIN_USERNAME'] ?? 'admin')),
+        'password'             => (getenv('ADMIN_PASSWORD') ?: ($_SERVER['ADMIN_PASSWORD'] ?? $_ENV['ADMIN_PASSWORD'] ?? 'changeme')),
+        'cache_ttl_hours'      => (int)(getenv('CACHE_TTL_HOURS') ?: ($_SERVER['CACHE_TTL_HOURS'] ?? $_ENV['CACHE_TTL_HOURS'] ?? 24)),
+        'featured_subset_size' => (int)(getenv('FEATURED_SUBSET_SIZE') ?: ($_SERVER['FEATURED_SUBSET_SIZE'] ?? $_ENV['FEATURED_SUBSET_SIZE'] ?? 5)),
+    ],
 ];

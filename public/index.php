@@ -1,3 +1,24 @@
+<?php
+/**
+ * index.php — CleanPlate public homepage.
+ * Converted from index.html to enable server-side visit tracking.
+ */
+// ── Track this visit (silent — never breaks page on DB failure) ───────────────
+$_trackBase = __DIR__ . '/../includes';
+if (file_exists($_trackBase . '/Database.php') && file_exists($_trackBase . '/VisitTracker.php')) {
+    try {
+        require_once $_trackBase . '/Config.php';
+        require_once $_trackBase . '/Database.php';
+        require_once $_trackBase . '/VisitTracker.php';
+        Config::load();
+        VisitTracker::record();
+    } catch (Throwable $_te) {
+        error_log('index.php VisitTracker: ' . $_te->getMessage());
+    }
+}
+unset($_trackBase, $_te);
+// ── End tracking — all below is the original index.html ───────────────────────
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,6 +66,14 @@
                             <a href="https://cooking.nytimes.com/" target="_blank" rel="noopener noreferrer" class="site-badge">NYT Cooking</a>
                             <a href="https://www.seriouseats.com/" target="_blank" rel="noopener noreferrer" class="site-badge">Serious Eats</a>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ── Featured Recipes Carousel ─────────────────────── -->
+                <div id="featured-carousel" class="featured-carousel" style="display:none;">
+                    <p class="featured-label">Check out recent recipe favorites:</p>
+                    <div class="featured-viewport">
+                        <div id="featured-track" class="featured-track"></div>
                     </div>
                 </div>
 

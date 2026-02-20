@@ -17,8 +17,19 @@ set_time_limit(Config::get('scraper.timeouts.request', 30));
 // Configuration: Enable confidence score logging
 $debugConfidenceScoring = Config::env('CONFIDENCE_DEBUG', false);
 
-// Include the parser class
+// Include the parser class and DB layer
 require_once __DIR__ . '/../../includes/RecipeParser.php';
+require_once __DIR__ . '/../../includes/Database.php';
+require_once __DIR__ . '/../../includes/ExtractionRepository.php';
+
+// Bootstrap the extraction repository (DB connection is lazy)
+$repo = null;
+try {
+    $repo = new ExtractionRepository(Database::getInstance());
+} catch (Exception $dbEx) {
+    // DB unavailable — log but don't block the scraper
+    error_log('CleanPlate DB connect failed: ' . $dbEx->getMessage());
+}
 
 // Set JSON response headers
 header('Content-Type: application/json; charset=utf-8');
@@ -151,18 +162,52 @@ if (Config::get('security.rate_limit.enabled', true)) {
     $_SESSION['api_requests'][] = $now;
 }
 
+// ── Cache check ─────────────────────────────────────────────────────────────
+if ($repo !== null) {
+    $urlHash = ExtractionRepository::hashUrl($url);
+    $cached  = $repo->findCachedByHash($urlHash);
+
+    if ($cached !== null) {
+        // Serve from cache: decode the stored raw_response and return it
+        $cachedPayload = json_decode($cached['raw_response'] ?? 'null', true);
+        if ($cachedPayload !== null) {
+            $repo->incrementCacheHit((int)$cached['id']);
+            $cachedPayload['_cached']    = true;
+            $cachedPayload['_cached_at'] = $cached['cached_at'];
+            respondWithSuccess($cachedPayload);
+        }
+    }
+}
+
 // Parse the recipe
 try {
+    $parseStartMs = (int)round(microtime(true) * 1000);
+
     // Enable debug logging if configured
     $parser = new RecipeParser($debugConfidenceScoring);
     $result = $parser->parse($url);
-    
+
+    $processingMs = (int)round(microtime(true) * 1000) - $parseStartMs;
+
+    // Persist to DB
+    if ($repo !== null) {
+        try {
+            $repo->upsert($url, $processingMs, $result, null);
+        } catch (Exception $dbEx) {
+            error_log('CleanPlate DB upsert failed: ' . $dbEx->getMessage());
+        }
+    }
+
     respondWithSuccess($result);
     
 } catch (Exception $e) {
     // SECURITY: Log errors safely without exposing sensitive details
     $logMessage = 'Recipe parsing error for domain: ' . (parse_url($url, PHP_URL_HOST) ?: 'unknown');
     error_log($logMessage);
+
+    $processingMs = isset($parseStartMs)
+        ? (int)round(microtime(true) * 1000) - $parseStartMs
+        : 0;
     
     // Only log stack traces in development
     if (getenv('APP_ENV') !== 'production') {
@@ -219,7 +264,19 @@ try {
             'Copy the recipe content manually from your browser'
         ];
     }
-    
+
+    // Persist error to DB
+    if ($repo !== null) {
+        try {
+            $repo->upsert($url, $processingMs, null, [
+                'code'    => $errorType,
+                'message' => $e->getMessage(),
+            ]);
+        } catch (Exception $dbEx) {
+            error_log('CleanPlate DB error upsert failed: ' . $dbEx->getMessage());
+        }
+    }
+
     respondWithError($errorCode, $errorType, $userMessage, $suggestions);
 }
 

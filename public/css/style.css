@@ -1889,6 +1889,102 @@ body[data-view="print"] .image-carousel {
 }
 
 /* Print Styles */
+/* ── Featured Recipes Carousel ────────────────────────────────────────────── */
+.featured-carousel {
+    margin-top: 2.5rem;
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.featured-label {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.featured-viewport {
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.featured-track {
+    display: flex;
+    will-change: transform;
+    /* transition set dynamically by JS */
+}
+
+.featured-card {
+    flex: 0 0 auto;
+    padding: 0 0.3rem;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.featured-card-inner {
+    background: var(--color-paper);
+    border: 1px solid var(--color-border-light);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    height: 100%;
+    min-height: 4rem;
+}
+
+.featured-card-inner:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.12);
+    transform: translateY(-2px);
+}
+
+.fcard-image {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: var(--color-border-light);
+    flex-shrink: 0;
+}
+
+.fcard-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.fcard-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.fcard-domain {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: auto;
+    padding-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .featured-carousel {
+        max-width: 100%;
+    }
+}
+
 @media print {
     body {
         background: #fff;

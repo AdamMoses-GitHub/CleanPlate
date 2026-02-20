@@ -1,0 +1,42 @@
+{
+    "generated_at": "2026-02-20T21:18:40+00:00",
+    "total_featured": 6,
+    "subset_size": 5,
+    "recipes": [
+        {
+            "id": 4,
+            "url": "https://www.foodnetwork.com/recipes/food-network-kitchen/air-fryer-chicken-thighs-with-salsa-verde-and-lemony-kale-salad-9822450",
+            "title": "Air Fryer Chicken Thighs with Salsa Verde and Lemony Kale Salad",
+            "domain": "www.foodnetwork.com",
+            "image": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2021/03/18/0/FNK_AIR_FRYER_CHICKEN_THIGHS_H_f_s4x3.jpg.rend.hgtvcom.1280.1280.suffix/1770308489323.webp"
+        },
+        {
+            "id": 7,
+            "url": "https://www.foodnetwork.com/recipes/food-network-kitchen/the-best-chicken-and-rice-8133711",
+            "title": "The Best Chicken and Rice",
+            "domain": "www.foodnetwork.com",
+            "image": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2020/03/10/0/FNK_BEST-CHICKEN-AND-RICE-H_s4x3.jpg.rend.hgtvcom.1280.1280.suffix/1583851621211.webp"
+        },
+        {
+            "id": 5,
+            "url": "https://www.foodnetwork.com/recipes/giada-de-laurentiis/easy-pantry-chicken-8761467",
+            "title": "Easy Pantry Chicken",
+            "domain": "www.foodnetwork.com",
+            "image": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2020/06/18/GH902_easy-pantry-chicken_s4x3.jpg.rend.hgtvcom.1280.1280.suffix/1614360992127.webp"
+        },
+        {
+            "id": 6,
+            "url": "https://www.foodnetwork.com/recipes/melissa-darabian/chicken-in-mustard-recipe-1923558",
+            "title": "Chicken in Mustard",
+            "domain": "www.foodnetwork.com",
+            "image": "https://food.fnr.sndimg.com/content/dam/images/food/fullset/2015/12/8/2/MN0401H_Chicken-in-Mustard_s4x3.jpg.rend.hgtvcom.1280.1280.suffix/1449689063300.webp"
+        },
+        {
+            "id": 2,
+            "url": "https://www.bbcgoodfood.com/recipes/brilliant-banana-loaf",
+            "title": "Banana bread",
+            "domain": "www.bbcgoodfood.com",
+            "image": "https://images.immediate.co.uk/production/volatile/sites/30/2020/06/recipe-image-legacy-id-1273522_8-a6b9246.jpg?resize=440,400"
+        }
+    ]
+}
