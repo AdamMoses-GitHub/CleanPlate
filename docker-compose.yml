@@ -1,3 +1,11 @@
+# =============================================================================
+# LOCAL DEVELOPMENT ONLY — DO NOT USE FOR PRODUCTION DEPLOYMENT
+# =============================================================================
+# This file spins up a local PHP+Apache+MySQL dev environment.
+# For VPS/shared hosting, deploy the files directly and configure a .env file
+# (copy .env.example → .env and fill in your values).
+# =============================================================================
+
 services:
 
   # ── PHP + Apache ─────────────────────────────────────────────────────────────

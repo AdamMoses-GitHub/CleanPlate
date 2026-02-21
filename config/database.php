@@ -30,7 +30,7 @@ return [
     'connections' => [
         'mysql' => [
             'driver'    => 'mysql',
-            'host'      => _db_env('DB_HOST',      'db'),
+            'host'      => _db_env('DB_HOST',      '127.0.0.1'),
             'port'      => (int)_db_env('DB_PORT',  3306),
             'database'  => _db_env('DB_DATABASE',  'cleanplate'),
             'username'  => _db_env('DB_USERNAME',  'root'),
