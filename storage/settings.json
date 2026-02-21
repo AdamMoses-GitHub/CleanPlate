@@ -1,0 +1,23 @@
+{
+    "offline": {
+        "enabled": false,
+        "message": "We'll be back soon! CleanPlate is currently undergoing maintenance.",
+        "eta": ""
+    },
+    "cache": {
+        "ttl_hours": 24
+    },
+    "carousel": {
+        "subset_size": 5
+    },
+    "scraper": {
+        "timeout": 10,
+        "min_delay": 2,
+        "ssl_verify": true
+    },
+    "rate_limit": {
+        "enabled": true,
+        "requests": 10,
+        "period": 60
+    }
+}

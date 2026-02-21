@@ -7,6 +7,8 @@
 // Load configuration system
 require_once __DIR__ . '/../../includes/Config.php';
 Config::load();
+require_once __DIR__ . '/../../includes/SiteSettings.php';
+SiteSettings::apply(); // override env-based config with admin-saved runtime settings
 
 // Configure PHP based on app settings
 error_reporting(E_ALL);

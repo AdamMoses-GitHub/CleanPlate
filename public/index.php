@@ -3,6 +3,44 @@
  * index.php — CleanPlate public homepage.
  * Converted from index.html to enable server-side visit tracking.
  */
+// ── Offline / maintenance mode check ─────────────────────────────────────────
+// Read settings.json directly (skips full Config boot for speed).
+// The admin panel is not subject to this check.
+$_settingsFile = __DIR__ . '/../storage/settings.json';
+if (file_exists($_settingsFile)) {
+    $_settings = @json_decode(file_get_contents($_settingsFile), true);
+    if (!empty($_settings['offline']['enabled'])) {
+        $__msg = htmlspecialchars($_settings['offline']['message'] ?? "We'll be back soon!");
+        $__eta = htmlspecialchars($_settings['offline']['eta']     ?? '');
+        http_response_code(503);
+        header('Retry-After: 3600');
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
+        echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
+        echo '<title>CleanPlate — Maintenance</title>';
+        echo '<style>';
+        echo '*{box-sizing:border-box;margin:0;padding:0}';
+        echo 'body{min-height:100vh;display:flex;align-items:center;justify-content:center;';
+        echo '     background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1a202c}';
+        echo '.card{text-align:center;padding:3rem 2.5rem;max-width:480px;width:90%;';
+        echo '      background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}';
+        echo '.logo{font-size:1.5rem;font-weight:700;color:#3b82f6;margin-bottom:1.5rem}';
+        echo 'h1{font-size:1.25rem;font-weight:600;margin-bottom:.75rem}';
+        echo 'p{font-size:.95rem;color:#64748b;line-height:1.6}';
+        echo '.eta{display:inline-block;margin-top:1.25rem;padding:.35rem .9rem;';
+        echo '     background:#eff6ff;color:#1d4ed8;border-radius:999px;font-size:.85rem;font-weight:500}';
+        echo '</style></head><body>';
+        echo '<div class="card">';
+        echo '<div class="logo">CleanPlate</div>';
+        echo '<h1>Back soon &#9749;</h1>';
+        echo "<p>{$__msg}</p>";
+        if ($__eta !== '') echo "<span class=\"eta\">&#x23F0; {$__eta}</span>";
+        echo '</div></body></html>';
+        exit;
+    }
+}
+unset($_settingsFile, $_settings, $__msg, $__eta);
+// ── End offline check ─────────────────────────────────────────────────────────
+
 // ── Track this visit (silent — never breaks page on DB failure) ───────────────
 $_trackBase = __DIR__ . '/../includes';
 if (file_exists($_trackBase . '/Database.php') && file_exists($_trackBase . '/VisitTracker.php')) {

@@ -54,6 +54,11 @@ $adminUser = AdminAuth::getUsername();
                 <span class="nav-icon">★</span> Featured
             </a>
 
+            <div class="nav-section">System</div>
+            <a href="/admin/settings.php"  class="<?= $activeNav==='settings'    ? 'active' : '' ?>">
+                <span class="nav-icon">⚙</span> Settings
+            </a>
+
             <div class="nav-section">Tools</div>
             <a href="/" target="_blank">
                 <span class="nav-icon">↗</span> View Site
