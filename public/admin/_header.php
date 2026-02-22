@@ -53,6 +53,9 @@ $adminUser = AdminAuth::getUsername();
             <a href="/admin/featured.php"    class="<?= $activeNav==='featured'    ? 'active' : '' ?>">
                 <span class="nav-icon">★</span> Featured
             </a>
+            <a href="/admin/bulk-import.php" class="<?= $activeNav==='bulk-import' ? 'active' : '' ?>">
+                <span class="nav-icon">⇊</span> Bulk Import
+            </a>
 
             <div class="nav-section">System</div>
             <a href="/admin/settings.php"  class="<?= $activeNav==='settings'    ? 'active' : '' ?>">

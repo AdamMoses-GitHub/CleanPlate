@@ -174,8 +174,9 @@ if ($repo !== null) {
         $cachedPayload = json_decode($cached['raw_response'] ?? 'null', true);
         if ($cachedPayload !== null) {
             $repo->incrementCacheHit((int)$cached['id']);
-            $cachedPayload['_cached']    = true;
-            $cachedPayload['_cached_at'] = $cached['cached_at'];
+            $cachedPayload['_cached']       = true;
+            $cachedPayload['_cached_at']    = $cached['cached_at'];
+            $cachedPayload['extraction_id'] = (int)$cached['id'];
             respondWithSuccess($cachedPayload);
         }
     }
@@ -194,7 +195,8 @@ try {
     // Persist to DB
     if ($repo !== null) {
         try {
-            $repo->upsert($url, $processingMs, $result, null);
+            $extractionId = $repo->upsert($url, $processingMs, $result, null);
+            $result['extraction_id'] = (int)$extractionId;
         } catch (Exception $dbEx) {
             error_log('CleanPlate DB upsert failed: ' . $dbEx->getMessage());
         }
