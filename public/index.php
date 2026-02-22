@@ -6,7 +6,8 @@
 // ── Offline / maintenance mode check ─────────────────────────────────────────
 // Read settings.json directly (skips full Config boot for speed).
 // The admin panel is not subject to this check.
-$_settingsFile = __DIR__ . '/../storage/settings.json';
+$_settingsFile     = __DIR__ . '/../storage/settings.json';
+$_statDailyRecipes = 0;
 if (file_exists($_settingsFile)) {
     $_settings = @json_decode(file_get_contents($_settingsFile), true);
     if (!empty($_settings['offline']['enabled'])) {
@@ -37,6 +38,8 @@ if (file_exists($_settingsFile)) {
         echo '</div></body></html>';
         exit;
     }
+    // Capture stats tagline value before clearing the settings array
+    $_statDailyRecipes = (int)($_settings['stats']['daily_recipes'] ?? 0);
 }
 unset($_settingsFile, $_settings, $__msg, $__eta);
 // ── End offline check ─────────────────────────────────────────────────────────
@@ -329,6 +332,9 @@ unset($_trackBase, $_te);
         </main>
 
         <footer>
+            <?php if (!empty($_statDailyRecipes)): ?>
+                <p class="site-stat-line">Serving up over <?= number_format((int)$_statDailyRecipes) ?>+ clean recipes a day &mdash; and counting.</p>
+            <?php endif; unset($_statDailyRecipes); ?>
             <p>Powered by CleanPlate &copy; 2026<span class="footer-creator"> | Created By <a href="https://adammoses.com/hello" target="_blank" rel="noopener noreferrer">Adam Moses</a></span></p>
         </footer>
     </div>

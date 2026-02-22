@@ -37,6 +37,9 @@ class SiteSettings
             'cache' => [
                 'ttl_hours' => 24,
             ],
+            'stats' => [
+                'daily_recipes' => 0,
+            ],
             'carousel' => [
                 'list_size' => 5,
             ],

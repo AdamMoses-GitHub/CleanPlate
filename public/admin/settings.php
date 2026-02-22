@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../includes/AdminAuth.php';
 AdminAuth::check();
 require_once __DIR__ . '/../../includes/SiteSettings.php';
 SiteSettings::load();
+require_once __DIR__ . '/../../includes/Database.php';
+require_once __DIR__ . '/../../includes/ExtractionRepository.php';
 
 $flash     = '';
 $flashType = 'success';
@@ -17,6 +19,9 @@ $flashType = 'success';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save') {
 
     $new = [
+        'stats' => [
+            'daily_recipes' => max(0, (int)($_POST['stats_daily_recipes'] ?? 0)),
+        ],
         'offline' => [
             'enabled' => isset($_POST['offline_enabled']),
             'message' => trim($_POST['offline_message'] ?? ''),
@@ -47,6 +52,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
 
 // Re-read current values for the form (picks up just-saved values)
 $s = SiteSettings::all();
+
+// Real successful extraction count — used as a hint on the stats setting
+$realSuccessCount = 0;
+try {
+    $statsRepo      = new ExtractionRepository(Database::getInstance());
+    $dbStats        = $statsRepo->getDashboardStats();
+    $realSuccessCount = (int)($dbStats['total_success'] ?? 0);
+} catch (Throwable $_se) {
+    // DB unavailable — hint simply won’t show
+}
+unset($statsRepo, $dbStats, $_se);
 
 $pageTitle = 'Settings';
 $activeNav = 'settings';
@@ -96,7 +112,27 @@ require __DIR__ . '/_header.php';
                    value="<?= htmlspecialchars($s['offline']['eta'] ?? '') ?>">
         </div>
     </div>
+    <!-- ── Site Stats ───────────────────────────────────────────────────── -->
+    <div class="settings-section">
+        <div class="settings-section-header">
+            <h2>Site Stats Tagline</h2>
+            <p>Shows <em>"Serving up over N clean recipes a day — and counting."</em> above the footer on the homepage. Set to 0 to hide it.</p>
+        </div>
 
+        <div class="settings-row">
+            <div class="settings-group">
+                <label for="stats_daily_recipes">Recipes shown in tagline</label>
+                <input type="number" id="stats_daily_recipes" name="stats_daily_recipes"
+                       class="settings-input settings-input-sm" min="0"
+                       value="<?= (int)($s['stats']['daily_recipes'] ?? 0) ?>">
+                <?php if ($realSuccessCount > 0): ?>
+                    <p class="label-hint" style="margin-top:.4rem;">
+                        Real DB count: <strong><?= number_format($realSuccessCount) ?></strong> successful extractions
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
     <!-- ── Extraction Cache ─────────────────────────────────────────────────── -->
     <div class="settings-section">
         <div class="settings-section-header">

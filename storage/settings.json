@@ -7,6 +7,9 @@
     "cache": {
         "ttl_hours": 24
     },
+    "stats": {
+        "daily_recipes": 1700
+    },
     "carousel": {
         "list_size": 5
     },
