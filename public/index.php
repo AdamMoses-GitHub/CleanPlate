@@ -64,7 +64,7 @@ unset($_trackBase, $_te);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CleanPlate - Recipe Extractor</title>
     <link rel="stylesheet" href="css/style.css">
 </head>

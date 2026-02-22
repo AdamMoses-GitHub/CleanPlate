@@ -1095,7 +1095,8 @@ header {
 footer {
     margin-top: auto;
     padding-top: 3rem;
-    padding-bottom: 2rem;
+    /* max() falls back gracefully on non-notched devices */
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
     text-align: center;
     color: var(--color-text-secondary);
     font-size: 0.875rem;
@@ -1916,6 +1917,8 @@ body[data-view="print"] .image-carousel {
     overflow: hidden;
     position: relative;
     width: 100%;
+    /* Pass vertical scrolling to browser; let JS handle horizontal swipes */
+    touch-action: pan-y;
 }
 
 .featured-track {
@@ -1990,6 +1993,43 @@ body[data-view="print"] .image-carousel {
 @media (max-width: 640px) {
     .featured-carousel {
         max-width: 100%;
+    }
+
+    /* Cards are wider on mobile — make text more legible */
+    .fcard-title {
+        font-size: 0.875rem;
+    }
+
+    .fcard-domain {
+        font-size: 0.75rem;
+    }
+
+    /* Suppress the hover-lift effect — not meaningful on touch */
+    .featured-card-inner:hover {
+        transform: none;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 2.25rem;
+    }
+
+    h2 {
+        font-size: 1.875rem;
+    }
+
+    .tagline {
+        font-size: 1rem;
+    }
+
+    .site-stat-line {
+        font-size: 0.875rem;
+    }
+
+    /* Single-card view — give the card more breathing room */
+    .featured-card-inner {
+        padding: 0.875rem;
     }
 }
 

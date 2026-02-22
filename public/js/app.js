@@ -1361,6 +1361,11 @@ class FeaturedCarousel {
             this.startTimer();
         }
 
+        // Touch swipe always active when there are multiple cards
+        if (this.total > 1) {
+            this.bindTouch();
+        }
+
         // Recompute card widths on window resize
         window.addEventListener('resize', () => {
             this.sizeCards();
@@ -1389,8 +1394,18 @@ class FeaturedCarousel {
 
     sizeCards() {
         const vpWidth = this.section.clientWidth;
-        const count   = Math.min(this.visibleCount, this.total);
-        this.cardWidth = vpWidth / count;
+        // Responsive effective count: fewer cards on smaller screens
+        const w = window.innerWidth;
+        let effectiveCount;
+        if (w < 480) {
+            effectiveCount = 1.2; // 1 full card + peek at the next
+        } else if (w < 768) {
+            effectiveCount = 2.4; // 2 full cards + peek
+        } else {
+            effectiveCount = Math.min(this.visibleCount, this.total);
+        }
+        this.effectiveCount = effectiveCount;
+        this.cardWidth = vpWidth / effectiveCount;
 
         const totalCards = this.track.children.length;
         Array.from(this.track.children).forEach(c => {
@@ -1407,7 +1422,6 @@ class FeaturedCarousel {
     }
 
     advance() {
-        if (this.paused) return;
         this.current++;
         this.setOffset(true);
 
@@ -1421,14 +1435,47 @@ class FeaturedCarousel {
         this.track.addEventListener('transitionend', onEnd, { once: true });
     }
 
+    retreat() {
+        if (this.current > 0) {
+            this.current--;
+            this.setOffset(true);
+        } else {
+            // At position 0 — snap to last real card without animation
+            this.current = this.total - 1;
+            this.setOffset(false);
+        }
+    }
+
     startTimer() {
-        this.timer = setInterval(() => this.advance(), this.intervalMs);
+        // paused check lives here so touch/manual calls always navigate
+        this.timer = setInterval(() => {
+            if (!this.paused) this.advance();
+        }, this.intervalMs);
     }
 
     bindHover() {
         const vp = this.track.parentElement;
         vp.addEventListener('mouseenter', () => { this.paused = true; });
         vp.addEventListener('mouseleave', () => { this.paused = false; });
+    }
+
+    bindTouch() {
+        const vp = this.track.parentElement;
+        let startX = 0;
+
+        vp.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            this.paused = true;
+        }, { passive: true });
+
+        vp.addEventListener('touchend', (e) => {
+            const deltaX = e.changedTouches[0].clientX - startX;
+            this.paused = false;
+            // Require at least 40px movement to count as a deliberate swipe
+            if (Math.abs(deltaX) > 40) {
+                deltaX > 0 ? this.retreat() : this.advance();
+            }
+        }, { passive: true });
     }
 
     handleCardClick(card) {
