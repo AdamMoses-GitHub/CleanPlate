@@ -38,7 +38,7 @@ class SiteSettings
                 'ttl_hours' => 24,
             ],
             'carousel' => [
-                'subset_size' => 5,
+                'list_size' => 5,
             ],
             'scraper' => [
                 'timeout'    => 10,
@@ -79,6 +79,11 @@ class SiteSettings
 
         // Deep-merge saved values over defaults
         self::$data = self::deepMerge(self::defaults(), $saved);
+
+        // Migrate legacy 'subset_size' key → 'list_size' transparently
+        if (isset($saved['carousel']['subset_size']) && !isset($saved['carousel']['list_size'])) {
+            self::$data['carousel']['list_size'] = (int)$saved['carousel']['subset_size'];
+        }
     }
 
     // ── Read ───────────────────────────────────────────────────────────────────
@@ -145,7 +150,7 @@ class SiteSettings
      *
      * Values that map to Config keys:
      *   cache.ttl_hours         → admin.cache_ttl_hours
-     *   carousel.subset_size    → admin.featured_subset_size
+     *   carousel.list_size      → admin.featured_list_size
      *   scraper.timeout         → scraper.timeouts.request
      *   scraper.min_delay       → scraper.timeouts.min_delay
      *   scraper.ssl_verify      → scraper.ssl.verify_peer
@@ -167,8 +172,8 @@ class SiteSettings
         }
 
         // Carousel
-        if (isset($s['carousel']['subset_size'])) {
-            Config::set('admin.featured_subset_size', (int)$s['carousel']['subset_size']);
+        if (isset($s['carousel']['list_size'])) {
+            Config::set('admin.featured_list_size', (int)$s['carousel']['list_size']);
         }
 
         // Scraper

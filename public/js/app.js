@@ -1321,9 +1321,15 @@ class FeaturedCarousel {
             const res = await fetch('./data/featured.json');
             if (!res.ok) return;
             const data = await res.json();
-            const recipes = (data.recipes || []).filter(r => r.url && r.title);
-            if (recipes.length === 0) return;
-            this.render(recipes);
+            const pool = (data.recipes || []).filter(r => r.url && r.title);
+            if (pool.length === 0) return;
+            // Shuffle the full pool client-side, then slice to list_size
+            const listSize = data.list_size || this.visibleCount;
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+            this.render(pool.slice(0, listSize));
         } catch (_) {
             // JSON not published yet — section stays hidden
         }

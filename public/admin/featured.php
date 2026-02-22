@@ -1,7 +1,7 @@
 <?php
 /**
  * Admin — Featured recipes management
- * Supports mark/unmark featured, and up/down ordering for the carousel.
+ * Supports mark/unmark featured and publishing randomized carousel lists.
  */
 require_once __DIR__ . '/../../includes/Config.php';
 Config::load();
@@ -10,6 +10,8 @@ AdminAuth::check();
 
 require_once __DIR__ . '/../../includes/Database.php';
 require_once __DIR__ . '/../../includes/ExtractionRepository.php';
+require_once __DIR__ . '/../../includes/SiteSettings.php';
+SiteSettings::load();
 
 $repo  = new ExtractionRepository(Database::getInstance());
 $flash = '';
@@ -23,47 +25,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $repo->markFeatured($id, false);
         $flash = 'Removed from featured.';
 
-    } elseif ($action === 'move_up' && $id) {
-        // Swap featured_order with the item above
-        $featured = $repo->getFeatured();
-        $idx = array_search($id, array_column($featured, 'id'));
-        if ($idx > 0) {
-            $above = $featured[$idx - 1];
-            $orderA = $featured[$idx]['featured_order'] ?? ($idx + 1);
-            $orderB = $above['featured_order']          ?? $idx;
-            $repo->setFeaturedOrder((int)$featured[$idx]['id'], (int)$orderB);
-            $repo->setFeaturedOrder((int)$above['id'],          (int)$orderA);
-        }
-
-    } elseif ($action === 'move_down' && $id) {
-        $featured = $repo->getFeatured();
-        $idx = array_search($id, array_column($featured, 'id'));
-        if ($idx !== false && $idx < count($featured) - 1) {
-            $below = $featured[$idx + 1];
-            $orderA = $featured[$idx]['featured_order'] ?? ($idx + 1);
-            $orderB = $below['featured_order']          ?? ($idx + 2);
-            $repo->setFeaturedOrder((int)$featured[$idx]['id'], (int)$orderB);
-            $repo->setFeaturedOrder((int)$below['id'],          (int)$orderA);
-        }
+    } elseif ($action === 'save_settings') {
+        $listSize = max(1, min(50, (int)($_POST['list_size'] ?? 5)));
+        SiteSettings::save(['carousel' => ['list_size' => $listSize]]);
+        $flash = 'Carousel settings saved.';
 
     } elseif ($action === 'publish') {
-        $subsetSize = max(1, (int) Config::get('admin.featured_subset_size', 5));
-        $all = $repo->getFeaturedForPublish();
+        $listSize = max(1, (int) SiteSettings::get('carousel.list_size', 5));
+        $all      = $repo->getFeaturedForPublish();
         if (!empty($all)) {
-            $pool = $all;
-            shuffle($pool);
-            $subset = array_slice($pool, 0, $subsetSize);
             $payload = [
                 'generated_at'   => date('c'),
                 'total_featured' => count($all),
-                'subset_size'    => count($subset),
+                'list_size'      => $listSize,
                 'recipes'        => array_map(fn($r) => [
                     'id'     => (int)$r['id'],
                     'url'    => $r['url'],
                     'title'  => $r['title'] ?: 'Untitled',
                     'domain' => $r['domain'],
                     'image'  => $r['image_url'] ?: null,
-                ], $subset),
+                ], $all),
             ];
             $dataDir = __DIR__ . '/../data';
             if (!is_dir($dataDir)) mkdir($dataDir, 0755, true);
@@ -71,16 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dataDir . '/featured.json',
                 json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             );
-            $flash = 'Homepage carousel published! (' . count($subset) . ' recipe' . (count($subset) !== 1 ? 's' : '') . ' from ' . count($all) . ' featured).';
+            $flash = 'Published! ' . count($all) . ' recipe' . (count($all) !== 1 ? 's' : '')
+                   . ' in pool, ' . $listSize . ' shown per visit.';
         } else {
             $flash = 'No featured recipes found — mark some as featured first.';
         }
-    }
-
-    // Normalise order values after every change to keep them clean
-    $featured = $repo->getFeatured();
-    foreach ($featured as $pos => $item) {
-        $repo->setFeaturedOrder((int)$item['id'], $pos + 1);
     }
 }
 
@@ -94,19 +70,47 @@ require __DIR__ . '/_header.php';
     <div class="alert alert-success"><?= htmlspecialchars($flash) ?></div>
 <?php endif; ?>
 
+<!-- ── Publish Settings ────────────────────────────────────────────────── -->
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Carousel Publish Settings</span>
+    </div>
+    <div class="panel-body" style="padding:1.25rem 1.5rem;">
+        <form method="POST" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-end;">
+            <input type="hidden" name="action" value="save_settings">
+            <div style="display:flex;flex-direction:column;gap:.35rem;">
+                <label for="list_size" style="font-size:.875rem;font-weight:500;">
+                    Recipes shown per visit <span style="font-weight:400;color:var(--color-text-secondary);font-size:.8rem;">(1–50)</span>
+                </label>
+                <input type="number" id="list_size" name="list_size"
+                       min="1" max="50"
+                       style="width:100px;padding:.4rem .6rem;border:1px solid var(--color-border);border-radius:4px;"
+                       value="<?= (int) SiteSettings::get('carousel.list_size', 5) ?>">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-accent btn-sm">Save Settings</button>
+            </div>
+        </form>
+        <p style="font-size:.78rem;color:var(--color-text-secondary);margin:.85rem 0 0;">
+            On <strong>Publish</strong>, all featured recipes are saved to the JSON file.
+            Each homepage visit randomly picks this many to display in the carousel.
+        </p>
+    </div>
+</div>
+
 <div class="panel">
     <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
         <div>
             <span class="panel-title">Featured Recipes (<?= count($featured) ?>)</span>
             <span class="text-muted" style="font-size:.78rem;display:block;margin-top:.2rem;">
-                These appear in the front-page carousel. Drag order is set with ↑↓ buttons.
+                These appear in the front-page carousel. Order does not matter — lists are randomized on publish.
             </span>
         </div>
         <form method="POST" style="margin:0;">
             <input type="hidden" name="action" value="publish">
             <button type="submit" class="btn btn-primary btn-sm"
                     <?= empty($featured) ? 'disabled' : '' ?>
-                    title="Randomly pick up to <?= (int)Config::get('admin.featured_subset_size', 5) ?> featured recipes and write /public/data/featured.json">
+                    title="Save all <?= count($featured) ?> featured recipes to featured.json (JS picks <?= (int)SiteSettings::get('carousel.list_size', 5) ?> at random each visit)">
                 ↑ Publish to Homepage
             </button>
         </form>
@@ -125,7 +129,6 @@ require __DIR__ . '/_header.php';
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width:48px;">Order</th>
                     <th>Image</th>
                     <th>Title</th>
                     <th>Domain</th>
@@ -135,9 +138,8 @@ require __DIR__ . '/_header.php';
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($featured as $pos => $row): ?>
+            <?php foreach ($featured as $row): ?>
                 <tr>
-                    <td style="font-weight:600;text-align:center;"><?= $pos + 1 ?></td>
                     <td>
                         <?php if ($row['image_url']): ?>
                             <img src="<?= htmlspecialchars($row['image_url']) ?>"
@@ -158,30 +160,12 @@ require __DIR__ . '/_header.php';
                         <?= htmlspecialchars(substr($row['first_seen_at'] ?? '', 0, 10)) ?>
                     </td>
                     <td>
-                        <div class="flex-gap">
-                            <?php if ($pos > 0): ?>
-                            <form method="POST" style="display:inline">
-                                <input type="hidden" name="action" value="move_up">
-                                <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-                                <button type="submit" class="btn btn-ghost btn-sm" title="Move up">↑</button>
-                            </form>
-                            <?php endif; ?>
-
-                            <?php if ($pos < count($featured) - 1): ?>
-                            <form method="POST" style="display:inline">
-                                <input type="hidden" name="action" value="move_down">
-                                <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-                                <button type="submit" class="btn btn-ghost btn-sm" title="Move down">↓</button>
-                            </form>
-                            <?php endif; ?>
-
-                            <form method="POST" style="display:inline"
-                                  onsubmit="return confirm('Remove from featured?');">
-                                <input type="hidden" name="action" value="unfeature">
-                                <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-                                <button type="submit" class="btn btn-danger btn-sm">✖ Unfeature</button>
-                            </form>
-                        </div>
+                        <form method="POST" style="display:inline"
+                              onsubmit="return confirm('Remove from featured?');">
+                            <input type="hidden" name="action" value="unfeature">
+                            <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                            <button type="submit" class="btn btn-danger btn-sm">✖ Unfeature</button>
+                        </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -197,7 +181,7 @@ require __DIR__ . '/_header.php';
     </div>
     <div class="panel-body">
         <p style="font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.75rem;">
-            Browse successful extractions and click <strong>★ Mark Featured</strong> on any detail page.
+            Toggle featured status directly from the extractions list, or from any recipe's detail page.
         </p>
         <a href="/admin/extractions.php?status=success&featured=0" class="btn btn-accent btn-sm">
             Browse unfeatured successes →

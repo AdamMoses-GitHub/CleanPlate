@@ -25,9 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
         'cache' => [
             'ttl_hours' => max(1, (int)($_POST['cache_ttl_hours'] ?? 24)),
         ],
-        'carousel' => [
-            'subset_size' => max(1, min(10, (int)($_POST['carousel_subset_size'] ?? 5))),
-        ],
         'scraper' => [
             'timeout'    => max(5, min(120, (int)($_POST['scraper_timeout']   ?? 10))),
             'min_delay'  => max(0, min(30,  (int)($_POST['scraper_min_delay'] ?? 2))),
@@ -117,22 +114,6 @@ require __DIR__ . '/_header.php';
         </div>
     </div>
 
-    <!-- ── Featured Carousel ───────────────────────────────────────────────── -->
-    <div class="settings-section">
-        <div class="settings-section-header">
-            <h2>Featured Carousel</h2>
-            <p>Controls how many recipes are randomly picked when you publish the homepage carousel.</p>
-        </div>
-
-        <div class="settings-row">
-            <div class="settings-group">
-                <label for="carousel_subset_size">Cards shown in carousel <span class="label-hint">(1–10)</span></label>
-                <input type="number" id="carousel_subset_size" name="carousel_subset_size"
-                       class="settings-input settings-input-sm" min="1" max="10"
-                       value="<?= (int)($s['carousel']['subset_size'] ?? 5) ?>">
-            </div>
-        </div>
-    </div>
 
     <!-- ── Scraper ──────────────────────────────────────────────────────────── -->
     <div class="settings-section">

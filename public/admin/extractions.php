@@ -11,7 +11,32 @@ require_once __DIR__ . '/../../includes/Database.php';
 require_once __DIR__ . '/../../includes/ExtractionRepository.php';
 
 $repo = new ExtractionRepository(Database::getInstance());
-
+// ── POST: toggle featured ──────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_featured') {
+    $toggleId = (int)($_POST['id'] ?? 0);
+    if ($toggleId) {
+        $existing = $repo->findById($toggleId);
+        if ($existing) {
+            $repo->markFeatured($toggleId, !(bool)$existing['is_featured']);
+        }
+    }
+    // PRG — rebuild query string from hidden filter params, then redirect back
+    $back = array_filter([
+        'q'         => $_POST['_q']         ?? '',
+        'status'    => $_POST['_status']    ?? '',
+        'domain'    => $_POST['_domain']    ?? '',
+        'featured'  => $_POST['_featured']  ?? '',
+        'conf_min'  => $_POST['_conf_min']  ?? '',
+        'conf_max'  => $_POST['_conf_max']  ?? '',
+        'date_from' => $_POST['_date_from'] ?? '',
+        'date_to'   => $_POST['_date_to']   ?? '',
+        'sort'      => $_POST['_sort']      ?? '',
+        'dir'       => $_POST['_dir']       ?? '',
+        'page'      => $_POST['_page']      ?? '',
+    ], fn($v) => $v !== '');
+    header('Location: /admin/extractions.php' . ($back ? '?' . http_build_query($back) : ''));
+    exit;
+}
 // ── Collect filters from GET ───────────────────────────────────────────────
 $filters = [
     'q'         => trim($_GET['q']         ?? ''),
@@ -205,8 +230,29 @@ require __DIR__ . '/_header.php';
                     <td><?= $row['is_featured'] ? '<span class="badge badge-featured">★</span>' : '' ?></td>
                     <td class="text-muted" style="font-size:.72rem;"><?= htmlspecialchars(substr($row['last_seen_at'] ?? '', 0, 16)) ?></td>
                     <td>
-                        <a href="/admin/extraction-detail.php?id=<?= (int)$row['id'] ?>"
-                           class="btn btn-ghost btn-sm">View</a>
+                        <div class="flex-gap">
+                            <a href="/admin/extraction-detail.php?id=<?= (int)$row['id'] ?>"
+                               class="btn btn-ghost btn-sm">View</a>
+                            <form method="POST" style="display:inline">
+                                <input type="hidden" name="action"    value="toggle_featured">
+                                <input type="hidden" name="id"        value="<?= (int)$row['id'] ?>">
+                                <input type="hidden" name="_q"         value="<?= htmlspecialchars($filters['q']) ?>">
+                                <input type="hidden" name="_status"    value="<?= htmlspecialchars($filters['status']) ?>">
+                                <input type="hidden" name="_domain"    value="<?= htmlspecialchars($filters['domain']) ?>">
+                                <input type="hidden" name="_featured"  value="<?= htmlspecialchars($filters['featured']) ?>">
+                                <input type="hidden" name="_conf_min"  value="<?= htmlspecialchars($filters['conf_min']) ?>">
+                                <input type="hidden" name="_conf_max"  value="<?= htmlspecialchars($filters['conf_max']) ?>">
+                                <input type="hidden" name="_date_from" value="<?= htmlspecialchars($filters['date_from']) ?>">
+                                <input type="hidden" name="_date_to"   value="<?= htmlspecialchars($filters['date_to']) ?>">
+                                <input type="hidden" name="_sort"      value="<?= htmlspecialchars($filters['sort']) ?>">
+                                <input type="hidden" name="_dir"       value="<?= htmlspecialchars($filters['dir']) ?>">
+                                <input type="hidden" name="_page"      value="<?= (int)$filters['page'] ?>">
+                                <button type="submit" class="btn btn-ghost btn-sm"
+                                        title="<?= $row['is_featured'] ? 'Remove from featured' : 'Mark as featured' ?>">
+                                    <?= $row['is_featured'] ? '★' : '☆' ?>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             <?php endforeach; ?>
