@@ -20,6 +20,9 @@ storage/temp/*
 !storage/logs/.gitkeep
 !storage/temp/.gitkeep
 
+# Generated runtime data (publish from admin, not source code)
+public/data/featured.json
+
 # IDE
 .vscode/
 .idea/

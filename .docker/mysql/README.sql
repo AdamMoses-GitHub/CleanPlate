@@ -1,0 +1,11 @@
+-- Drop any .sql files in this folder to auto-run them when the MySQL
+-- container is first created (i.e., when db_data volume doesn't exist yet).
+--
+-- Files are executed in alphabetical order. Suggested naming:
+--   001_create_schema.sql
+--   002_seed_data.sql
+--
+-- Example:
+--   CREATE DATABASE IF NOT EXISTS cleanplate;
+--   USE cleanplate;
+--   CREATE TABLE recipes (...);

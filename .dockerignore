@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Docker files (no need to copy into the image — project is volume-mounted)
+Dockerfile
+docker-compose.yml
+
+# Documentation
+*.md
+screenshot.jpg
+
+# Example/test fixtures (large, not needed in image layer)
+examples/
+
+# Runtime storage — will be created by the container
+storage/logs/
+storage/cache/
+storage/temp/
+
+# OS noise
+.DS_Store
+Thumbs.db

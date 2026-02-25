@@ -74,6 +74,11 @@ class Config {
                 if (($value[0] === '"' && substr($value, -1) === '"') ||
                     ($value[0] === "'" && substr($value, -1) === "'")) {
                     $value = substr($value, 1, -1);
+                } else {
+                    // Strip inline comments from unquoted values (e.g. DB_HOST=localhost # comment)
+                    if (preg_match('/\s+#/', $value)) {
+                        $value = trim(preg_replace('/\s+#.*$/', '', $value));
+                    }
                 }
             }
             

@@ -2,6 +2,30 @@
 
 ## Priority Items
 
+### Image Handling
+- [ ] **Save images locally** - Download and store recipe images on the server
+  - [ ] Download primary recipe image on extraction
+  - [ ] Store images in `storage/images/` with hashed filenames
+  - [ ] Fall back gracefully if remote image is unavailable
+  - [ ] Serve local images via a public endpoint
+  - [ ] Clean up orphaned images when recipes are deleted
+
+### Text-Based Extraction
+- [ ] **Extract recipe from arbitrary text** - Parse a recipe from any pasted or uploaded text block
+  - [ ] Accept plain text, markdown, and basic HTML input
+  - [ ] Reuse existing `RecipeParser` normalization pipeline
+  - [ ] Expose a new API endpoint (`/api/parser.php?mode=text`)
+  - [ ] Add UI textarea input alongside the URL field
+  - [ ] Return the same structured JSON as URL-based extraction
+
+### Instruction Processing
+- [ ] **Post-process recipe steps** - Clean and enrich extracted instructions
+  - [ ] Strip redundant whitespace, numbering artefacts, and HTML entities
+  - [ ] Split run-together steps into discrete sentences
+  - [ ] Detect and tag time references (e.g., "bake for 30 minutes")
+  - [ ] Highlight temperature values for quick scanning
+  - [ ] Optionally group steps into phases (Prep / Cook / Serve)
+
 ### Database & Storage
 - [ ] **MySQL database integration** - Store extracted recipes with metadata
   - [ ] Design schema (recipes, ingredients, instructions, metadata, images)
@@ -166,6 +190,6 @@
 
 ---
 
-**Last Updated:** February 6, 2026  
+**Last Updated:** February 20, 2026  
 **Project:** CleanPlate Recipe Extractor  
 **Version:** 2.0.0

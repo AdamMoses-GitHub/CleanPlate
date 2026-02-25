@@ -1296,6 +1296,206 @@ const UI = {
     }
 };
 
+// Featured Recipes Carousel
+class FeaturedCarousel {
+    /**
+     * @param {number} visibleCount  Cards visible at once (default 5)
+     * @param {number} intervalMs    Auto-advance delay in ms (default 3000)
+     */
+    constructor(visibleCount = 5, intervalMs = 3000) {
+        this.visibleCount = visibleCount;
+        this.intervalMs   = intervalMs;
+        this.current      = 0;    // index of first visible card
+        this.total        = 0;    // real (non-clone) card count
+        this.cardWidth    = 0;    // px, set on render
+        this.timer        = null;
+        this.paused       = false;
+        this.section      = document.getElementById('featured-carousel');
+        this.track        = document.getElementById('featured-track');
+    }
+
+    /** Fetch /data/featured.json and render. Silently does nothing if missing. */
+    async load() {
+        if (!this.section || !this.track) return;
+        try {
+            const res = await fetch('./data/featured.json');
+            if (!res.ok) return;
+            const data = await res.json();
+            const pool = (data.recipes || []).filter(r => r.url && r.title);
+            if (pool.length === 0) return;
+            // Shuffle the full pool client-side, then slice to list_size
+            const listSize = data.list_size || this.visibleCount;
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+            this.render(pool.slice(0, listSize));
+        } catch (_) {
+            // JSON not published yet — section stays hidden
+        }
+    }
+
+    render(recipes) {
+        this.total = recipes.length;
+        const needsLoop = recipes.length > this.visibleCount;
+
+        // Clone first `visibleCount` cards so the loop looks seamless
+        const all = needsLoop
+            ? [...recipes, ...recipes.slice(0, this.visibleCount)]
+            : recipes;
+
+        this.track.innerHTML = all.map(r => this.buildCard(r)).join('');
+
+        // Show section BEFORE measuring clientWidth — hidden elements return 0
+        this.section.style.display = 'block';
+        this.sizeCards();
+
+        // Bind clicks on every card (including clones)
+        this.track.querySelectorAll('.featured-card').forEach(card => {
+            card.addEventListener('click', () => this.handleCardClick(card));
+        });
+
+        if (needsLoop) {
+            this.setOffset(false);
+            this.bindHover();
+            this.startTimer();
+        }
+
+        // Touch swipe always active when there are multiple cards
+        if (this.total > 1) {
+            this.bindTouch();
+        }
+
+        // Recompute card widths on window resize
+        window.addEventListener('resize', () => {
+            this.sizeCards();
+            this.setOffset(false);
+        });
+    }
+
+    buildCard(recipe) {
+        const esc = s => String(s || '')
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const displayDomain = (recipe.domain || '').replace(/^www\./, '');
+        const imgHtml = recipe.image
+            ? `<div class="fcard-image"><img src="${esc(recipe.image)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`
+            : '';
+
+        return `<div class="featured-card" data-url="${esc(recipe.url)}">
+                    <div class="featured-card-inner">
+                        ${imgHtml}
+                        <div class="fcard-title">${esc(recipe.title)}</div>
+                        <div class="fcard-domain">${esc(displayDomain)}</div>
+                    </div>
+                </div>`;
+    }
+
+    sizeCards() {
+        const vpWidth = this.section.clientWidth;
+        // Responsive effective count: fewer cards on smaller screens
+        const w = window.innerWidth;
+        let effectiveCount;
+        if (w < 480) {
+            effectiveCount = 1.2; // 1 full card + peek at the next
+        } else if (w < 768) {
+            effectiveCount = 2.4; // 2 full cards + peek
+        } else {
+            effectiveCount = Math.min(this.visibleCount, this.total);
+        }
+        this.effectiveCount = effectiveCount;
+        this.cardWidth = vpWidth / effectiveCount;
+
+        const totalCards = this.track.children.length;
+        Array.from(this.track.children).forEach(c => {
+            c.style.width = this.cardWidth + 'px';
+        });
+        this.track.style.width = (totalCards * this.cardWidth) + 'px';
+    }
+
+    setOffset(animate = true) {
+        this.track.style.transition = animate
+            ? 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+            : 'none';
+        this.track.style.transform = `translateX(${-this.current * this.cardWidth}px)`;
+    }
+
+    advance() {
+        this.current++;
+        this.setOffset(true);
+
+        // After slide, if we've entered the clone zone, snap back instantly
+        const onEnd = () => {
+            if (this.current >= this.total) {
+                this.current = 0;
+                this.setOffset(false);
+            }
+        };
+        this.track.addEventListener('transitionend', onEnd, { once: true });
+    }
+
+    retreat() {
+        if (this.current > 0) {
+            this.current--;
+            this.setOffset(true);
+        } else {
+            // At position 0 — snap to last real card without animation
+            this.current = this.total - 1;
+            this.setOffset(false);
+        }
+    }
+
+    startTimer() {
+        // paused check lives here so touch/manual calls always navigate
+        this.timer = setInterval(() => {
+            if (!this.paused) this.advance();
+        }, this.intervalMs);
+    }
+
+    bindHover() {
+        const vp = this.track.parentElement;
+        vp.addEventListener('mouseenter', () => { this.paused = true; });
+        vp.addEventListener('mouseleave', () => { this.paused = false; });
+    }
+
+    bindTouch() {
+        const vp = this.track.parentElement;
+        let startX = 0;
+
+        vp.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            this.paused = true;
+        }, { passive: true });
+
+        vp.addEventListener('touchend', (e) => {
+            const deltaX = e.changedTouches[0].clientX - startX;
+            this.paused = false;
+            // Require at least 40px movement to count as a deliberate swipe
+            if (Math.abs(deltaX) > 40) {
+                deltaX > 0 ? this.retreat() : this.advance();
+            }
+        }, { passive: true });
+    }
+
+    handleCardClick(card) {
+        const url = card.dataset.url;
+        if (!url) return;
+
+        const input = document.getElementById('url-input');
+        if (!input) return;
+
+        input.value = url;
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Trigger the form submit so the recipe loads immediately
+        const form = document.getElementById('parse-form');
+        if (form) {
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }
+    }
+}
+
 // Main Application
 class CleanPlateApp {
     constructor() {
@@ -1434,4 +1634,8 @@ class CleanPlateApp {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     new CleanPlateApp();
+
+    // Load featured carousel (5 visible, 3 s advance; silently hidden if no JSON yet)
+    const carousel = new FeaturedCarousel(5, 3000);
+    carousel.load();
 });
